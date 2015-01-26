@@ -1,0 +1,12 @@
+
+{
+"foo"
+size = 1
+size = 2
+}
+
+{
+"bar"
+size_max = 2
+size = 2
+}

@@ -1,0 +1,11 @@
+{
+"multiline
+	// this is still the name
+	name"
+size_max = 5
+}
+{
+"c style
+escapes are required \"\t\n, illegal escape will cause an error"
+size = 4
+}

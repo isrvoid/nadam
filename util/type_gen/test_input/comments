@@ -1,0 +1,7 @@
+
+// C style comments are supported
+{
+/* "this is not a name */
+"this is"// size = 10
+size /* don't care */=		7
+} // end
