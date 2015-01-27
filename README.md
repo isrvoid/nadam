@@ -48,3 +48,47 @@ In a fixed length type, binary data follows the id directly.
 Id of a variable length type is followed by 4 bytes. Those represent the length of the data.
 
 TODO example of pragma messages
+
+### Type generator utility
+Type generator program should aleviate the need to implement own message type generator for every language.
+
+For C/C++ it creates a simple interface that allowes to iterate through generated types. Queried type would look
+something like this:
+```c
+struct MessageType
+{
+	uint8_t sha[20];
+	bool isVariableSize;
+	uint32_t size;
+};
+
+struct NamedMessageType
+{
+	const char* name;
+	size_t nameLength;
+	struct MessageType type;
+};
+```
+Types should be connected to their names using a hash map for faster lookup. Hash calculations could be cached.
+
+Input to the generator is simpe text describing the types:
+```c
+/* C style comments */
+{ // every type must be enclosed in brackets
+"foo"
+size = 42 // fixed size message
+}
+
+{
+"\"bar\" is also a valid name" // C style escapes
+size_max = 42 // variable size message
+}
+
+{size=3"whitespaces and position shouldn't really matter"}
+
+// { "foo" size = 42 } // name repeated - this would caused an error
+/*
+An exact duplicate could have been ignored, but for simplicity and
+because repeated name might indicate a problem, it results in an error
+*/
+```
