@@ -1,16 +1,16 @@
-## Namdam - Named Data Messaging
+## Nadam - Named Data Messaging
 ### About
-Namdam is a definition rather than a library. Any tranmitted message has to be known to both communicating sides.
+Nadam is a definition rather than a library. Any tranmitted message has to be known to both communicating sides.
 Not every participant needs to be aware of all existing message types. A 1:n server:clients arrangement is possible,
 where a client would communicate using only a subset of available messages.
 
 An Implementation requires following data about a type:
 ```d
-struct NamdamMessage
+struct NadamMessage
 {
 	string name; // arbitrary UTF-8 string
-	bool isVariableLength;
-	uint length; // represents maximum length, if isVariableLength is true
+	bool isVariableSize;
+	uint size; // represents maximum length, if isVariableLength is true
 }
 ```
 
@@ -20,7 +20,7 @@ If additional salt is used, every participant needs to know it.
 An Attempt to use unknown message name or incorrect length might terminate a connection.
 
 ### Interface
-Hooking-up Namdam reference implementation to an underlying transmission method requieres 2 functions.
+Hooking-up Nadam reference implementation to an underlying transmission method requieres 2 functions.
 ```d
 void send(in ubyte[] buf);
 ubyte[] recv(uint len);
