@@ -1,0 +1,6 @@
+token;// this is a comment
+// comment "not a string"
+"string // not a comment"token;"string"/* comment "not a string"
+still comment "still not a string\" not string"
+*/token;/* comment */"string \" \\ with \" a \"\"few\" escapes \"// not a comment"/*ano
+ther comment*/ token;"string with \+ \- illegal \ escapes"
