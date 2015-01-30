@@ -1,6 +1,6 @@
 ## Nadam - Named Data Messaging
 ### About
-Nadam is a definition rather than a library. Any tranmitted message has to be known to both communicating sides.
+Nadam is a definition rather than a library. Any transmitted message has to be known to both communicating sides.
 Not every participant needs to be aware of all existing message types. A 1:n server:clients arrangement is possible,
 where a client would communicate using only a subset of available messages.
 
