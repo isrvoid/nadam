@@ -1,15 +1,25 @@
 import std.stdio, std.file, std.regex;
 
+enum stringsAndCommentsPattern = "(\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\")|(/\\*[^\\*/]*\\*/|//.*$)";
+enum opIndexComment = 2;
+
+auto ctr = ctRegex!(stringsAndCommentsPattern, "m");
+
 void main(string[] args)
 {
-	auto testInput = readText("test_input/parser");
+    auto testInput = readText("test_input/parser");
 
-	enum stringsAndCommentsPattern = "(\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\")|(/\\*[^\\*/]*\\*/|//.*$)";
-	auto ctr = ctRegex!(stringsAndCommentsPattern, "m");
+    writeln("input:\n", testInput);
+    writeln("comments removed:\n", removeComments(testInput));
+}
 
-	writeln("input:\n", testInput);
+S removeComments(S : string)(S input) 
+{
+    return replaceAll!(removeComment)(input, ctr);
+}
 
-	writeln("parsed:");
-	foreach (c; matchAll(testInput, ctr))
-		writeln(c.hit);
+string removeComment(Captures!(string) m)
+{
+    bool isCommentMatch = m.opIndex(opIndexComment) != null;
+    return isCommentMatch ? "" : m.hit;
 }
