@@ -2,10 +2,24 @@ module nadam.typegen.common;
 
 import std.stdio, std.file, std.regex;
 
-enum stringsAndCommentsPattern = "(\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\")|(/\\*[^\\*/]*\\*/|//.*$)";
-enum opIndexComment = 2;
+immutable {
+    auto namePattern = "`(?P<name>[^`]+)`";
+    auto commentPattern = `(?P<comment>/\*[^\*/]*\*/|//.*$)`;
+    auto openingBracePattern = `(?P<openingBrace>\{)`;
+    auto closingBracePattern = `(?P<closingBrace>\})`;
+    auto sizePattern = `(?P<size>(?P<kind>size|size_max)\s*=\s*(?P<value>\d+))`;
+    auto undefinedTokenPattern = `(?P<undefined>[^\s]+?)`;
 
-auto ctr = ctRegex!(stringsAndCommentsPattern, "m");
+    auto compositePattern =
+        commentPattern ~ '|' ~
+        namePattern ~ '|' ~
+        sizePattern ~ '|' ~
+        openingBracePattern ~ '|' ~
+        closingBracePattern ~ '|' ~
+        undefinedTokenPattern;
+}
+
+auto ctr = ctRegex!(compositePattern, "m");
 
 void main(string[] args)
 {
@@ -13,6 +27,15 @@ void main(string[] args)
 
     writeln("input:\n", testInput);
     writeln("comments removed:\n", removeComments(testInput));
+
+    writeln("Undefined tokens:");
+    foreach (c; matchAll(testInput, ctr))
+    {
+        auto hit = c["undefined"];
+        if (hit.length > 0)
+            write(hit);
+    }
+    writeln();
 }
 
 S removeComments(S : string)(S input) 
@@ -22,16 +45,10 @@ S removeComments(S : string)(S input)
 
 string removeComment(Captures!(string) m)
 {
-    bool isCommentMatch = m.opIndex(opIndexComment) != null;
+    bool isCommentMatch = m["comment"].length > 0;
     return isCommentMatch ? "" : m.hit;
 }
 
 unittest
 {
-    string fooInput =
-        "/* comments are ignored */
-        {size= 7
-        // another comment
-        /* \"don't\" \" care */ \"foo\"
-        }";
 }
