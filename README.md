@@ -55,40 +55,33 @@ Type generator program should aleviate the need to implement own message type ge
 For C/C++ it creates a simple interface that allowes to iterate through generated types. Queried type would look
 something like this:
 ```c
-struct MessageType
-{
-	uint8_t sha[20];
+typedef struct {
+	uint8_t hash[20];
 	bool isVariableSize;
 	uint32_t size;
-};
+} nadam_messageId_t;
 
-struct NamedMessageType
-{
+struct {
 	const char* name;
 	size_t nameLength;
 	struct MessageType type;
-};
+} nadam_namedMessageId_t;
 ```
 Types should be connected to their names using a hash map for faster lookup. Hash calculations could be cached.
 
-Input to the generator is simpe text describing the types:
+Input to the generator is a simple text file containing message type definitions.
+Message is defined with a name followed by length.
+Name is a WYSIWYG string enclosed in \`\` (grave accents).
 ```c
-/* C style comments */
-{ // every type must be enclosed in brackets
-"foo"
+// C style comments
+`foo`
 size = 42 // fixed size message
-}
 
-{
-"\"bar\" is also a valid name" // C style escapes
+`C:\Program Files - probably not a very good "name", but still valid`
 size_max = 42 // variable size message
-}
 
-{size=3"whitespaces and position shouldn't really matter"}
+/* whitespaces are optional */ 'bar'size=3
 
-// { "foo" size = 42 } // name repeated - this would caused an error
-/*
-An exact duplicate could have been ignored, but for simplicity and
-because repeated name might indicate a problem, it results in an error
-*/
+`foo` // repeated name would cause an error
+size = 42
 ```
