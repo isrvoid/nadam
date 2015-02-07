@@ -44,35 +44,42 @@ immutable
     auto digitPattern = `(?P<value>\d+)`;
     auto undefinedTokenPattern = `(?P<undefined>\S+?)`;
 
-    auto commonTypeParsingPattern =
-        commentPattern ~ '|' ~
-        namePattern ~ '|' ~
-        sizeKeywordPattern ~ '|' ~
-        equalsSignPattern ~ '|' ~
-        digitPattern ~ '|' ~
-        undefinedTokenPattern;
+    auto parsingPattern = commentPattern ~ '|' ~ namePattern ~ '|' ~ sizeKeywordPattern ~ '|' ~
+        equalsSignPattern ~ '|' ~ digitPattern ~ '|' ~ undefinedTokenPattern;
 }
 
-auto ctr = ctRegex!(commonTypeParsingPattern, "m");
+    auto parsingRegex = ctRegex!(parsingPattern, "m");
 
 void main(string[] args)
 {
-    import std.stdio, std.file;
-    auto testInput = readText("typegen/test_input/parser");
+}
 
-    writeln("input:\n", testInput);
-
-    writeln("Undefined tokens:");
-    foreach (c; matchAll(testInput, ctr))
-    {
-        auto hit = c["undefined"];
-        if (hit.length > 0)
-            write(hit);
-    }
-    writeln();
+void forwardToNextNonComment(T)(ref T m)
+    if (is(typeof(m.front) == Captures!string))
+{
+    while (!m.empty && m.front["comment"] != null)
+        m.popFront();
 }
 
 unittest
 {
-    //auto commonInputFoo = "
+    auto nameAfterComments = " // comment
+        /* comment */ `foo`";
+    auto m = matchAll(nameAfterComments, parsingRegex);
+
+    forwardToNextNonComment(m);
+    assert(m.front["name"] == "foo");
+}
+
+unittest
+{
+    auto emptyInput = "";
+    auto m1 = matchAll(emptyInput, parsingRegex);
+    forwardToNextNonComment(m1);
+    assert(m1.empty);
+
+    auto commentFollowedByEndOfInput = " /* foo */ ";
+    auto m2 = matchAll(commentFollowedByEndOfInput, parsingRegex);
+    forwardToNextNonComment(m2);
+    assert(m2.empty);
 }
