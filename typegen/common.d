@@ -1,32 +1,66 @@
 module nadam.typegen.common;
 
-import std.stdio, std.file, std.regex;
+import std.regex;
+import std.conv : text;
 
-immutable {
-    auto namePattern = "`(?P<name>[^`]+)`";
+import nadam.types;
+
+class IncompleteMessageIdException : Exception
+{
+    this() pure nothrow @safe
+    {
+        auto msg = "Incomplete message ID at input's end.";
+        super(msg);
+    }
+}
+
+class IllegalTokenException : Exception
+{
+    this(string input, string token) pure nothrow @safe
+    {
+        size_t tokenPosition = token.ptr - input.ptr;
+        string msg = text("Token \"", token, "\" at position ", tokenPosition, " is illegal.");
+        super(msg);
+    }
+}
+
+class UnexpectedElementException : Exception
+{
+    this(string input, string element, string expected) pure nothrow @safe
+    {
+        size_t elementPosition = element.ptr - input.ptr;
+        string msg = text("Element \"", element, "\" at position ",
+                elementPosition, " seems to be out of order. Expected: ", expected);
+        super(msg);
+    }
+}
+
+immutable
+{
     auto commentPattern = `(?P<comment>/\*[^\*/]*\*/|//.*$)`;
-    auto openingBracePattern = `(?P<openingBrace>\{)`;
-    auto closingBracePattern = `(?P<closingBrace>\})`;
-    auto sizePattern = `(?P<size>(?P<kind>size|size_max)\s*=\s*(?P<value>\d+))`;
-    auto undefinedTokenPattern = `(?P<undefined>[^\s]+?)`;
+    auto namePattern = "`(?P<name>[^`]+)`";
+    auto sizeKeywordPattern = "(?P<sizeKeyword>size|size_max)";
+    auto equalsSignPattern = "=";
+    auto digitPattern = `(?P<value>\d+)`;
+    auto undefinedTokenPattern = `(?P<undefined>\S+?)`;
 
-    auto compositePattern =
+    auto commonTypeParsingPattern =
         commentPattern ~ '|' ~
         namePattern ~ '|' ~
-        sizePattern ~ '|' ~
-        openingBracePattern ~ '|' ~
-        closingBracePattern ~ '|' ~
+        sizeKeywordPattern ~ '|' ~
+        equalsSignPattern ~ '|' ~
+        digitPattern ~ '|' ~
         undefinedTokenPattern;
 }
 
-auto ctr = ctRegex!(compositePattern, "m");
+auto ctr = ctRegex!(commonTypeParsingPattern, "m");
 
 void main(string[] args)
 {
+    import std.stdio, std.file;
     auto testInput = readText("typegen/test_input/parser");
 
     writeln("input:\n", testInput);
-    writeln("comments removed:\n", removeComments(testInput));
 
     writeln("Undefined tokens:");
     foreach (c; matchAll(testInput, ctr))
@@ -38,17 +72,7 @@ void main(string[] args)
     writeln();
 }
 
-S removeComments(S : string)(S input) 
-{
-    return replaceAll!(removeComment)(input, ctr);
-}
-
-string removeComment(Captures!(string) m)
-{
-    bool isCommentMatch = m["comment"].length > 0;
-    return isCommentMatch ? "" : m.hit;
-}
-
 unittest
 {
+    //auto commonInputFoo = "
 }
