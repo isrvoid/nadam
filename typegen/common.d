@@ -5,6 +5,7 @@ import std.conv : text;
 
 import nadam.types;
 
+// FIXME forward throw location correctly
 class IncompleteMessageIdException : Exception
 {
     this() pure nothrow @safe
@@ -15,12 +16,12 @@ class IncompleteMessageIdException : Exception
 }
 
 // TODO refactor input string position handling into its own type
-class IllegalTokenException : Exception
+class UndefinedTokenException : Exception
 {
     this(string input, string token) pure nothrow @safe
     {
         size_t tokenPosition = token.ptr - input.ptr;
-        string msg = text("Token \"", token, "\" at position ", tokenPosition, " is illegal.");
+        string msg = text("Token \"", token, "\" at position ", tokenPosition, " is undefined.");
         super(msg);
     }
 }
@@ -55,11 +56,11 @@ immutable
     auto digitPattern = `(?P<digit>\d+)`;
     auto undefinedTokenPattern = `(?P<undefined>\S+?)`;
 
-    auto parsingPattern = commentPattern ~ '|' ~ namePattern ~ '|' ~ sizeKeywordPattern ~ '|' ~
+    auto parserPattern = commentPattern ~ '|' ~ namePattern ~ '|' ~ sizeKeywordPattern ~ '|' ~
         equalsSignPattern ~ '|' ~ digitPattern ~ '|' ~ undefinedTokenPattern;
 }
 
-    auto parsingRegex = ctRegex!(parsingPattern, "m");
+auto parserRegex = ctRegex!(parserPattern, "m");
 
 void main(string[] args)
 {
@@ -82,7 +83,7 @@ MessageIdSource getNextSource(T)(ref T m)
 // TODO refactor duplicate get function's code
 string getName(T)(ref T m)
 {
-    forwardToNextNonComment(m);
+    forwardToNextElement!false(m);
     if (m.empty)
         return null;
 
@@ -98,9 +99,7 @@ string getName(T)(ref T m)
 MessageSize getSize(T)(ref T m)
 {
     // size keyword
-    forwardToNextNonComment(m);
-    if (m.empty)
-        throw new IncompleteMessageIdException;
+    forwardToNextElement(m);
 
     auto sizeKeyword = m.front["sizeKeyword"];
     if (sizeKeyword == null)
@@ -108,18 +107,14 @@ MessageSize getSize(T)(ref T m)
 
     m.popFront();
     // equals sign
-    forwardToNextNonComment(m);
-    if (m.empty)
-        throw new IncompleteMessageIdException;
+    forwardToNextElement(m);
 
     if (m.hit != "=")
         throw new UnexpectedElementException("", m.hit, "equals sign"); // FIXME input missing
 
     m.popFront();
     // size value
-    forwardToNextNonComment(m);
-    if (m.empty)
-        throw new IncompleteMessageIdException;
+    forwardToNextElement(m);
 
     auto sizeElement = m.front["digit"];
     if (sizeElement == null)
@@ -134,20 +129,30 @@ MessageSize getSize(T)(ref T m)
     bool isVariableSize = (sizeKeyword == "size_max");
     return MessageSize(isVariableSize, size);
 }
-// FIXME replace forwardToNextNonComment with forwardToNextElement(bool throwAtEndOfInput = true)() - ignores comments, throws on ivalid
 
-void forwardToNextNonComment(T)(ref T m)
+void forwardToNextElement(bool throwAtInputsEnd = true, T)(ref T m)
     if (is(typeof(m.front) == Captures!string))
 {
     while (!m.empty && m.front["comment"] != null)
         m.popFront();
+
+    if (m.empty)
+    {
+        static if (throwAtInputsEnd)
+            throw new IncompleteMessageIdException;
+        else
+            return;
+    }
+
+    if (m.front["undefined"] != null)
+        throw new UndefinedTokenException("", m.front["undefined"]);
 }
 
 // getNextSource
 unittest
 {
     auto commentsOnly = "// the quick brown fox\n/* jumps over the lazy dog */";
-    auto m = matchAll(commentsOnly, parsingRegex);
+    auto m = matchAll(commentsOnly, parserRegex);
 
     assert(getNextSource(m) == MessageIdSource.init);
 }
@@ -155,7 +160,7 @@ unittest
 unittest
 {
     auto single = "`foo`\nsize = 3";
-    auto m = matchAll(single, parsingRegex);
+    auto m = matchAll(single, parserRegex);
 
     assert(getNextSource(m) == MessageIdSource("foo", MessageSize(false, 3)));
 }
@@ -163,7 +168,7 @@ unittest
 unittest
 {
     auto singleVariableSize = "`bar` size_max=42";
-    auto m = matchAll(singleVariableSize, parsingRegex);
+    auto m = matchAll(singleVariableSize, parserRegex);
 
     assert(getNextSource(m) == MessageIdSource("bar", MessageSize(true, 42)));
 }
@@ -172,7 +177,7 @@ unittest
 {
     auto sequence = "// comment\n`fun`size // comment\n= 3\n
         /* comment */ `gun`\nsize_max=\n /* comment */ 7";
-    auto m = matchAll(sequence, parsingRegex);
+    auto m = matchAll(sequence, parserRegex);
 
     assert(getNextSource(m) == MessageIdSource("fun", MessageSize(false, 3)));
     assert(getNextSource(m) == MessageIdSource("gun", MessageSize(true, 7)));
@@ -182,14 +187,14 @@ unittest
 unittest
 {
     auto negativeSize = "`fun` size = -8";
-    auto m = matchAll(negativeSize, parsingRegex);
+    auto m = matchAll(negativeSize, parserRegex);
 
     bool caughtException;
     try
     {
         getNextSource(m);
     }
-    catch (UnexpectedElementException e)
+    catch (UndefinedTokenException e)
     {
         caughtException = true;
     }
@@ -200,28 +205,47 @@ unittest
 // getSources
 // TODO duplicate name
 
-// forwardToNextNonComment
+// forwardToNextElement
 unittest
 {
     auto nameAfterComments = " // comment
         /* comment */ `foo`";
-    auto m = matchAll(nameAfterComments, parsingRegex);
+    auto m = matchAll(nameAfterComments, parserRegex);
 
-    forwardToNextNonComment(m);
+    forwardToNextElement!false(m);
     assert(m.front["name"] == "foo");
 }
 
 unittest
 {
     auto emptyInput = "";
-    auto m1 = matchAll(emptyInput, parsingRegex);
-    forwardToNextNonComment(m1);
+    auto m1 = matchAll(emptyInput, parserRegex);
+    forwardToNextElement!false(m1);
     assert(m1.empty);
 
-    auto commentFollowedByEndOfInput = " /* foo */ ";
-    auto m2 = matchAll(commentFollowedByEndOfInput, parsingRegex);
-    forwardToNextNonComment(m2);
+    auto comment = " /* foo */ ";
+    auto m2 = matchAll(comment, parserRegex);
+    forwardToNextElement!false(m2);
     assert(m2.empty);
+
+    auto m3 = matchAll(comment, parserRegex);
+    bool caughtException;
+    try
+        forwardToNextElement(m3);
+    catch (IncompleteMessageIdException e)
+        caughtException = true;
+    assert(caughtException);
 }
 
-// FIXME invalid token test
+unittest
+{
+    auto undefinedToken = " // comment\r\n? `foo` size = 123";
+    auto m = matchAll(undefinedToken, parserRegex);
+    bool caughtException;
+    try
+        forwardToNextElement(m);
+    catch (UndefinedTokenException e)
+        caughtException = true;
+    assert(caughtException);
+}
+
