@@ -11,7 +11,8 @@ struct MessageId
         SHA1 sha;
         sha.put(cast(immutable(ubyte)[]) source.name);
         sha.put(cast(ubyte) source.size.isVariable);
-        sha.put(cast(ubyte[]) [source.size.total]);
+        uint[1] convSize = [source.size.total];
+        sha.put(cast(ubyte[4]) convSize);
         hash = sha.finish();
 
         size = source.size;
