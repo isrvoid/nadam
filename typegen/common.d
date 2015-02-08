@@ -14,6 +14,7 @@ class IncompleteMessageIdException : Exception
     }
 }
 
+// TODO refactor input string position handling into its own type
 class IllegalTokenException : Exception
 {
     this(string input, string token) pure nothrow @safe
@@ -31,6 +32,16 @@ class UnexpectedElementException : Exception
         size_t elementPosition = element.ptr - input.ptr;
         string msg = text("Element \"", element, "\" at position ",
                 elementPosition, " seems to be out of order. Expected: ", expected);
+        super(msg);
+    }
+}
+
+class RepeatedNameException : Exception
+{
+    this(string input, string name) pure nothrow @safe
+    {
+        size_t namePosition = name.ptr - input.ptr;
+        string msg = text("Name \"", name, "\" at position ", namePosition, " was previously defined.");
         super(msg);
     }
 }
