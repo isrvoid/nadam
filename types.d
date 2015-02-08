@@ -55,6 +55,7 @@ struct MessageSize
     uint total;
     alias max = total;
 
+    // FIXME this(uint size, bool isVariableSize = false) pure nothrow @safe
     this(bool isVariableSize, uint size) pure nothrow @safe
     {
         isVariable = isVariableSize;
