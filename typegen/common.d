@@ -127,7 +127,7 @@ MessageSize getSize(T)(ref T m)
 
     // result
     bool isVariableSize = (sizeKeyword == "size_max");
-    return MessageSize(isVariableSize, size);
+    return MessageSize(size, isVariableSize);
 }
 
 void forwardToNextElement(bool throwAtInputsEnd = true, T)(ref T m)
@@ -162,7 +162,7 @@ unittest
     auto single = "`foo`\nsize = 3";
     auto m = matchAll(single, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource("foo", MessageSize(false, 3)));
+    assert(getNextSource(m) == MessageIdSource("foo", MessageSize(3)));
 }
 
 unittest
@@ -170,7 +170,7 @@ unittest
     auto singleVariableSize = "`bar` size_max=42";
     auto m = matchAll(singleVariableSize, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource("bar", MessageSize(true, 42)));
+    assert(getNextSource(m) == MessageIdSource("bar", MessageSize(42, true)));
 }
 
 unittest
@@ -179,8 +179,8 @@ unittest
         /* comment */ `gun`\nsize_max=\n /* comment */ 7";
     auto m = matchAll(sequence, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource("fun", MessageSize(false, 3)));
-    assert(getNextSource(m) == MessageIdSource("gun", MessageSize(true, 7)));
+    assert(getNextSource(m) == MessageIdSource("fun", MessageSize(3)));
+    assert(getNextSource(m) == MessageIdSource("gun", MessageSize(7, true)));
     assert(m.empty);
 }
 
