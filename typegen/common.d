@@ -66,87 +66,136 @@ void main(string[] args)
 {
 }
 
-// FIXME refactor to class, to not pass MatchResult around
-// this would also eliminate repeated MatchResult type tests
-MessageIdSource getNextSource(T)(ref T m)
-    if (is(typeof(m.front) == Captures!string))
+// TODO add function attributes
+class RegexMatchMarshaler(T)
+    if (is(typeof(T.init.front) == Captures!string))
 {
-    auto name = getName(m);
-    if (name == null)
-        return MessageIdSource.init;
+    private string input;
+    private T m;
 
-    auto size = getSize(m);
-
-    return MessageIdSource(name, size);
-}
-
-// TODO refactor duplicate get function's code
-string getName(T)(ref T m)
-{
-    forwardToNextElement!false(m);
-    if (m.empty)
-        return null;
-
-    auto name = m.front["name"];
-    if (name == null)
-        // also thrown if name is empty `` - fine for now
-        throw new UnexpectedElementException("", m.hit, "name"); // FIXME input missing
-
-    m.popFront();
-    return name;
-}
-
-MessageSize getSize(T)(ref T m)
-{
-    // size keyword
-    forwardToNextElement(m);
-
-    auto sizeKeyword = m.front["sizeKeyword"];
-    if (sizeKeyword == null)
-        throw new UnexpectedElementException("", m.hit, "size or size_max keyword"); // FIXME input missing
-
-    m.popFront();
-    // equals sign
-    forwardToNextElement(m);
-
-    if (m.hit != "=")
-        throw new UnexpectedElementException("", m.hit, "equals sign"); // FIXME input missing
-
-    m.popFront();
-    // size value
-    forwardToNextElement(m);
-
-    auto sizeElement = m.front["digit"];
-    if (sizeElement == null)
-        throw new UnexpectedElementException("", m.hit, "size value"); // FIXME input missing
-
-    m.popFront();
-
-    import std.conv : to;
-    uint size = to!uint(sizeElement);
-
-    // result
-    bool isVariableSize = (sizeKeyword == "size_max");
-    return MessageSize(size, isVariableSize);
-}
-
-void forwardToNextElement(bool throwAtInputsEnd = true, T)(ref T m)
-    if (is(typeof(m.front) == Captures!string))
-{
-    while (!m.empty && m.front["comment"] != null)
-        m.popFront();
-
-    if (m.empty)
+    this(T m, string input = "")
     {
-        static if (throwAtInputsEnd)
-            throw new IncompleteMessageIdException;
-        else
-            return;
+        this.input = input;
+        this.m = m;
     }
 
-    if (m.front["undefined"] != null)
-        throw new UndefinedTokenException("", m.front["undefined"]);
+    public MessageIdSource[] getSources()
+    {
+        MessageIdSource[] result;
+
+        return null; //FIXME
+    }
+
+    private MessageIdSource getNextSource()
+    {
+        auto name = getName();
+        if (name == null)
+            return MessageIdSource.init;
+
+        auto size = getSize();
+
+        return MessageIdSource(name, size);
+    }
+
+    // TODO refactor duplicate get function's code
+    private string getName()
+    {
+        forwardToNextElement!false();
+        if (m.empty)
+            return null;
+
+        auto name = m.front["name"];
+        if (name == null)
+            // also thrown if name is empty `` - fine for now
+            throw new UnexpectedElementException(input, m.hit, "name");
+
+        m.popFront();
+        return name;
+    }
+
+    private MessageSize getSize()
+    {
+        import std.conv : to;
+
+        // size keyword
+        forwardToNextElement();
+
+        auto sizeKeyword = m.front["sizeKeyword"];
+        if (sizeKeyword == null)
+            throw new UnexpectedElementException(input, m.hit, "size or size_max keyword");
+
+        m.popFront();
+
+        // equals sign
+        forwardToNextElement();
+
+        if (m.hit != "=")
+            throw new UnexpectedElementException(input, m.hit, "equals sign");
+
+        m.popFront();
+
+        // size value
+        forwardToNextElement();
+
+        auto sizeElement = m.front["digit"];
+        if (sizeElement == null)
+            throw new UnexpectedElementException(input, m.hit, "size value");
+
+        m.popFront();
+        uint size = to!uint(sizeElement);
+
+        // result
+        bool isVariableSize = (sizeKeyword == "size_max");
+        return MessageSize(size, isVariableSize);
+    }
+
+    private void forwardToNextElement(bool throwAtInputsEnd = true)()
+    {
+        while (!m.empty && m.front["comment"] != null)
+            m.popFront();
+
+        if (m.empty)
+        {
+            static if (throwAtInputsEnd)
+                throw new IncompleteMessageIdException;
+            else
+                return;
+        }
+
+        if (m.front["undefined"] != null)
+            throw new UndefinedTokenException(input, m.front["undefined"]);
+    }
+
+    // only for unittest
+    @property private typeof(T.init.front) front()
+    {
+        return m.front;
+    }
+
+    @property private typeof(T.init.empty) empty()
+    {
+        return m.empty;
+    }
 }
+
+public MessageIdSource[] parse(string commonTypeMessageIds)
+{
+    auto m = matchAll(commonTypeMessageIds, parserRegex);
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m, commonTypeMessageIds);
+
+    //return mrm.parseAll();
+    return null; // FIXME
+}
+
+// parse
+unittest
+{
+    auto comment = "// the quick brown fox";
+
+    auto idSources = parse(comment);
+    assert(idSources == null);
+}
+// FIXME add parse tests
 
 // getNextSource
 unittest
@@ -154,7 +203,8 @@ unittest
     auto commentsOnly = "// the quick brown fox\n/* jumps over the lazy dog */";
     auto m = matchAll(commentsOnly, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource.init);
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
+    assert(marshaler.getNextSource() == MessageIdSource.init);
 }
 
 unittest
@@ -162,7 +212,8 @@ unittest
     auto single = "`foo`\nsize = 3";
     auto m = matchAll(single, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource("foo", MessageSize(3)));
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
+    assert(marshaler.getNextSource() == MessageIdSource("foo", MessageSize(3)));
 }
 
 unittest
@@ -170,7 +221,8 @@ unittest
     auto singleVariableSize = "`bar` size_max=42";
     auto m = matchAll(singleVariableSize, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource("bar", MessageSize(42, true)));
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
+    assert(marshaler.getNextSource() == MessageIdSource("bar", MessageSize(42, true)));
 }
 
 unittest
@@ -179,9 +231,10 @@ unittest
         /* comment */ `gun`\nsize_max=\n /* comment */ 7";
     auto m = matchAll(sequence, parserRegex);
 
-    assert(getNextSource(m) == MessageIdSource("fun", MessageSize(3)));
-    assert(getNextSource(m) == MessageIdSource("gun", MessageSize(7, true)));
-    assert(m.empty);
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
+    assert(marshaler.getNextSource() == MessageIdSource("fun", MessageSize(3)));
+    assert(marshaler.getNextSource() == MessageIdSource("gun", MessageSize(7, true)));
+    assert(marshaler.empty);
 }
 
 unittest
@@ -189,10 +242,11 @@ unittest
     auto negativeSize = "`fun` size = -8";
     auto m = matchAll(negativeSize, parserRegex);
 
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m, negativeSize);
     bool caughtException;
     try
     {
-        getNextSource(m);
+        marshaler.getNextSource();
     }
     catch (UndefinedTokenException e)
     {
@@ -208,30 +262,33 @@ unittest
 // forwardToNextElement
 unittest
 {
-    auto nameAfterComments = " // comment
-        /* comment */ `foo`";
+    auto nameAfterComments = " // comment\n/* comment */ `foo`";
     auto m = matchAll(nameAfterComments, parserRegex);
 
-    forwardToNextElement!false(m);
-    assert(m.front["name"] == "foo");
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
+    marshaler.forwardToNextElement();
+    assert(marshaler.front["name"] == "foo");
 }
 
 unittest
 {
     auto emptyInput = "";
     auto m1 = matchAll(emptyInput, parserRegex);
-    forwardToNextElement!false(m1);
-    assert(m1.empty);
+    auto marshaler1 = new RegexMatchMarshaler!(typeof(m1))(m1);
+    marshaler1.forwardToNextElement!false();
+    assert(marshaler1.empty);
 
     auto comment = " /* foo */ ";
     auto m2 = matchAll(comment, parserRegex);
-    forwardToNextElement!false(m2);
-    assert(m2.empty);
+    auto marshaler2 = new RegexMatchMarshaler!(typeof(m2))(m2);
+    marshaler2.forwardToNextElement!false();
+    assert(marshaler2.empty);
 
     auto m3 = matchAll(comment, parserRegex);
+    auto marshaler3 = new RegexMatchMarshaler!(typeof(m3))(m3, comment);
     bool caughtException;
     try
-        forwardToNextElement(m3);
+        marshaler3.forwardToNextElement();
     catch (IncompleteMessageIdException e)
         caughtException = true;
     assert(caughtException);
@@ -241,9 +298,10 @@ unittest
 {
     auto undefinedToken = " // comment\r\n? `foo` size = 123";
     auto m = matchAll(undefinedToken, parserRegex);
+    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m, undefinedToken);
     bool caughtException;
     try
-        forwardToNextElement(m);
+        marshaler.forwardToNextElement();
     catch (UndefinedTokenException e)
         caughtException = true;
     assert(caughtException);
