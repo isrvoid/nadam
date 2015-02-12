@@ -42,7 +42,7 @@ class RepeatedNameException : Exception
     this(string input, string name) pure nothrow @safe
     {
         size_t namePosition = name.ptr - input.ptr;
-        string msg = text("Name \"", name, "\" at position ", namePosition, " was previously defined.");
+        string msg = text("Name \"", name, "\" at position ", namePosition, " was defined previously.");
         super(msg);
     }
 }
@@ -67,26 +67,56 @@ void main(string[] args)
 }
 
 // TODO add function attributes
-class RegexMatchMarshaler(T)
-    if (is(typeof(T.init.front) == Captures!string))
+class Parser
 {
-    private string input;
-    private T m;
-
-    this(T m, string input = "")
+    version (unittest)
     {
-        this.input = input;
-        this.m = m;
+        this(string input, bool parse = true)
+        {
+            this.input = toParse = input;
+            advanceFront();
+            if (parse)
+                sources = getSources().idup;
+        }
+    }
+    else
+    {
+        this(string input)
+        {
+            this.input = toParse = input;
+            advanceFront();
+            sources = getSources().idup;
+        }
     }
 
-    public MessageIdSource[] getSources()
-    {
-        MessageIdSource[] result;
+    immutable MessageIdSource[] sources;
 
-        return null; //FIXME
+    private:
+
+    string input, toParse;
+    Captures!string front;
+    bool[string] repeatedNameGuard;
+
+    MessageIdSource[] getSources()
+    {
+        MessageIdSource[] sources;
+        MessageIdSource currentSource;
+        while ((currentSource = getNextSource()) != MessageIdSource.init)
+            appendSource(sources, currentSource);
+
+        return sources;
     }
 
-    private MessageIdSource getNextSource()
+    void appendSource(ref MessageIdSource[] sources, MessageIdSource source)
+    {
+        if (source.name in repeatedNameGuard)
+            throw new RepeatedNameException(input, source.name);
+
+        repeatedNameGuard[source.name] = true;
+        sources ~= source;
+    }
+
+    MessageIdSource getNextSource()
     {
         auto name = getName();
         if (name == null)
@@ -98,50 +128,50 @@ class RegexMatchMarshaler(T)
     }
 
     // TODO refactor duplicate get function's code
-    private string getName()
+    string getName()
     {
         forwardToNextElement!false();
-        if (m.empty)
+        if (front.empty)
             return null;
 
-        auto name = m.front["name"];
+        auto name = front["name"];
         if (name == null)
             // also thrown if name is empty `` - fine for now
-            throw new UnexpectedElementException(input, m.hit, "name");
+            throw new UnexpectedElementException(input, front.hit, "name");
 
-        m.popFront();
+        advanceFront();
         return name;
     }
 
-    private MessageSize getSize()
+    MessageSize getSize()
     {
         import std.conv : to;
 
         // size keyword
         forwardToNextElement();
 
-        auto sizeKeyword = m.front["sizeKeyword"];
+        auto sizeKeyword = front["sizeKeyword"];
         if (sizeKeyword == null)
-            throw new UnexpectedElementException(input, m.hit, "size or size_max keyword");
+            throw new UnexpectedElementException(input, front.hit, "size or size_max keyword");
 
-        m.popFront();
+        advanceFront();
 
         // equals sign
         forwardToNextElement();
 
-        if (m.hit != "=")
-            throw new UnexpectedElementException(input, m.hit, "equals sign");
+        if (front.hit != "=")
+            throw new UnexpectedElementException(input, front.hit, "equals sign");
 
-        m.popFront();
+        advanceFront();
 
         // size value
         forwardToNextElement();
 
-        auto sizeElement = m.front["digit"];
+        auto sizeElement = front["digit"];
         if (sizeElement == null)
-            throw new UnexpectedElementException(input, m.hit, "size value");
+            throw new UnexpectedElementException(input, front.hit, "size value");
 
-        m.popFront();
+        advanceFront();
         uint size = to!uint(sizeElement);
 
         // result
@@ -149,12 +179,12 @@ class RegexMatchMarshaler(T)
         return MessageSize(size, isVariableSize);
     }
 
-    private void forwardToNextElement(bool throwAtInputsEnd = true)()
+    void forwardToNextElement(bool throwAtInputsEnd = true)()
     {
-        while (!m.empty && m.front["comment"] != null)
-            m.popFront();
+        while (!front.empty && front["comment"] != null)
+            advanceFront();
 
-        if (m.empty)
+        if (front.empty)
         {
             static if (throwAtInputsEnd)
                 throw new IncompleteMessageIdException;
@@ -162,91 +192,114 @@ class RegexMatchMarshaler(T)
                 return;
         }
 
-        if (m.front["undefined"] != null)
-            throw new UndefinedTokenException(input, m.front["undefined"]);
+        if (front["undefined"] != null)
+            throw new UndefinedTokenException(input, front["undefined"]);
     }
 
-    // only for unittest
-    @property private typeof(T.init.front) front()
+    void advanceFront() @safe
     {
-        return m.front;
-    }
-
-    @property private typeof(T.init.empty) empty()
-    {
-        return m.empty;
+        front = matchFirst(toParse, parserRegex);
+        toParse = front.post;
     }
 }
 
-public MessageIdSource[] parse(string commonTypeMessageIds)
-{
-    auto m = matchAll(commonTypeMessageIds, parserRegex);
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m, commonTypeMessageIds);
-
-    //return mrm.parseAll();
-    return null; // FIXME
-}
-
-// parse
+// parser
 unittest
 {
     auto comment = "// the quick brown fox";
+    auto parser = new Parser(comment);
 
-    auto idSources = parse(comment);
-    assert(idSources == null);
+    assert(parser.sources == null);
 }
-// FIXME add parse tests
+
+unittest
+{
+    import std.algorithm;
+
+    auto sequence = "/* the quick */`foo`size// brown fox\r\n =\n
+        /* jumpes over */42`bar`\n// the lazy dog\nsize_max=\r\n123";
+
+    auto parser = new Parser(sequence);
+    assert(parser.sources.length == 2);
+    assert(canFind(parser.sources, MessageIdSource("foo", MessageSize(42))));
+    assert(canFind(parser.sources, MessageIdSource("bar", MessageSize(123, true))));
+}
+
+unittest
+{
+    auto incomplete = "`fun` size = 1 `gun` size_max = // missing size";
+    bool caughtException;
+    try
+    {
+        auto parser = new Parser(incomplete);
+    }
+    catch (IncompleteMessageIdException e)
+    {
+        caughtException = true;
+    }
+    assert(caughtException);
+}
+
+unittest
+{
+    auto duplicateName = "`foo` size = 42 `foo` size = 42";
+    bool caughtException;
+    try
+    {
+        auto parser = new Parser(duplicateName);
+    }
+    catch (RepeatedNameException e)
+    {
+        caughtException = true;
+    }
+    assert(caughtException);
+}
 
 // getNextSource
 unittest
 {
     auto commentsOnly = "// the quick brown fox\n/* jumps over the lazy dog */";
-    auto m = matchAll(commentsOnly, parserRegex);
+    auto parser = new Parser(commentsOnly, false);
 
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
-    assert(marshaler.getNextSource() == MessageIdSource.init);
+    assert(parser.getNextSource() == MessageIdSource.init);
 }
 
 unittest
 {
     auto single = "`foo`\nsize = 3";
-    auto m = matchAll(single, parserRegex);
+    auto parser = new Parser(single, false);
 
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
-    assert(marshaler.getNextSource() == MessageIdSource("foo", MessageSize(3)));
+    assert(parser.getNextSource() == MessageIdSource("foo", MessageSize(3)));
 }
 
 unittest
 {
     auto singleVariableSize = "`bar` size_max=42";
-    auto m = matchAll(singleVariableSize, parserRegex);
+    auto parser = new Parser(singleVariableSize, false);
 
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
-    assert(marshaler.getNextSource() == MessageIdSource("bar", MessageSize(42, true)));
+    assert(parser.getNextSource() == MessageIdSource("bar", MessageSize(42, true)));
 }
 
 unittest
 {
     auto sequence = "// comment\n`fun`size // comment\n= 3\n
         /* comment */ `gun`\nsize_max=\n /* comment */ 7";
-    auto m = matchAll(sequence, parserRegex);
 
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
-    assert(marshaler.getNextSource() == MessageIdSource("fun", MessageSize(3)));
-    assert(marshaler.getNextSource() == MessageIdSource("gun", MessageSize(7, true)));
-    assert(marshaler.empty);
+    auto parser = new Parser(sequence, false);
+    assert(parser.getNextSource() == MessageIdSource("fun", MessageSize(3)));
+    assert(parser.getNextSource() == MessageIdSource("gun", MessageSize(7, true)));
+    assert(parser.front.empty);
 }
 
 unittest
 {
     auto negativeSize = "`fun` size = -8";
-    auto m = matchAll(negativeSize, parserRegex);
 
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m, negativeSize);
     bool caughtException;
+    auto parser = new Parser(negativeSize, false);
     try
     {
-        marshaler.getNextSource();
+        parser.getNextSource();
     }
     catch (UndefinedTokenException e)
     {
@@ -256,39 +309,33 @@ unittest
     assert(caughtException);
 }
 
-// getSources
-// TODO duplicate name
 
 // forwardToNextElement
 unittest
 {
     auto nameAfterComments = " // comment\n/* comment */ `foo`";
-    auto m = matchAll(nameAfterComments, parserRegex);
+    auto parser = new Parser(nameAfterComments, false);
 
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m);
-    marshaler.forwardToNextElement();
-    assert(marshaler.front["name"] == "foo");
+    parser.forwardToNextElement();
+    assert(parser.front["name"] == "foo");
 }
 
 unittest
 {
     auto emptyInput = "";
-    auto m1 = matchAll(emptyInput, parserRegex);
-    auto marshaler1 = new RegexMatchMarshaler!(typeof(m1))(m1);
-    marshaler1.forwardToNextElement!false();
-    assert(marshaler1.empty);
+    auto parser1 = new Parser(emptyInput, false);
+    parser1.forwardToNextElement!false();
+    assert(parser1.front.empty);
 
     auto comment = " /* foo */ ";
-    auto m2 = matchAll(comment, parserRegex);
-    auto marshaler2 = new RegexMatchMarshaler!(typeof(m2))(m2);
-    marshaler2.forwardToNextElement!false();
-    assert(marshaler2.empty);
+    auto parser2 = new Parser(comment, false);
+    parser2.forwardToNextElement!false();
+    assert(parser2.front.empty);
 
-    auto m3 = matchAll(comment, parserRegex);
-    auto marshaler3 = new RegexMatchMarshaler!(typeof(m3))(m3, comment);
+    auto parser3 = new Parser(comment, false);
     bool caughtException;
     try
-        marshaler3.forwardToNextElement();
+        parser3.forwardToNextElement();
     catch (IncompleteMessageIdException e)
         caughtException = true;
     assert(caughtException);
@@ -297,11 +344,10 @@ unittest
 unittest
 {
     auto undefinedToken = " // comment\r\n? `foo` size = 123";
-    auto m = matchAll(undefinedToken, parserRegex);
-    auto marshaler = new RegexMatchMarshaler!(typeof(m))(m, undefinedToken);
+    auto parser = new Parser(undefinedToken, false);
     bool caughtException;
     try
-        marshaler.forwardToNextElement();
+        parser.forwardToNextElement();
     catch (UndefinedTokenException e)
         caughtException = true;
     assert(caughtException);
