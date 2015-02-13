@@ -71,23 +71,21 @@ void main(string[] args)
 // TODO add function attributes
 class Parser
 {
+    this(string input)
+    {
+        this.input = toParse = input;
+        advanceFront();
+        sources = getSources().idup;
+    }
+
     version (unittest)
     {
-        this(string input, bool parse = true)
+        this(string input, bool parse)
         {
             this.input = toParse = input;
             advanceFront();
             if (parse)
                 sources = getSources().idup;
-        }
-    }
-    else
-    {
-        this(string input)
-        {
-            this.input = toParse = input;
-            advanceFront();
-            sources = getSources().idup;
         }
     }
 
@@ -97,25 +95,15 @@ class Parser
 
     string input, toParse;
     Captures!string front;
-    bool[string] repeatedNameGuard;
 
     MessageIdSource[] getSources()
     {
-        MessageIdSource[] sources;
+        auto collector = new SourceCollector;
         MessageIdSource currentSource;
         while ((currentSource = getNextSource()) != MessageIdSource.init)
-            appendSource(sources, currentSource);
+            collector.put(currentSource);
 
-        return sources;
-    }
-
-    void appendSource(ref MessageIdSource[] sources, MessageIdSource source)
-    {
-        if (source.name in repeatedNameGuard)
-            throw new RepeatedNameException(input, source.name);
-
-        repeatedNameGuard[source.name] = true;
-        sources ~= source;
+        return collector.sources;
     }
 
     MessageIdSource getNextSource()
@@ -202,6 +190,34 @@ class Parser
     {
         front = matchFirst(toParse, parserRegex);
         toParse = front.post;
+    }
+
+    class SourceCollector
+    {
+        import std.array : appender;
+
+        void put(MessageIdSource source) @safe
+        {
+            ensureNameUniqueness(source.name);
+            collector.put(source);
+        }
+
+        MessageIdSource[] sources() pure nothrow @property @safe
+        {
+            return collector.data;
+        }
+
+        private:
+        auto collector = appender!(MessageIdSource[])();
+        bool[string] repeatedNameGuard;
+
+        void ensureNameUniqueness(string name) @safe
+        {
+            if (name in repeatedNameGuard)
+                throw new RepeatedNameException(input, name);
+
+            repeatedNameGuard[name] = true;
+        }
     }
 }
 
