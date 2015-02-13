@@ -5,45 +5,47 @@ import std.conv : text;
 
 import nadam.types;
 
-// FIXME forward throw location correctly
 class IncompleteMessageIdException : Exception
 {
-    this() pure nothrow @safe
+    this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) pure nothrow @safe
     {
         auto msg = "Incomplete message ID at input's end.";
-        super(msg);
+        super(msg, file, line, next);
     }
 }
 
 // TODO refactor input string position handling into its own type
 class UndefinedTokenException : Exception
 {
-    this(string input, string token) pure nothrow @safe
+    this(string input, string token, string file = __FILE__,
+            size_t line = __LINE__, Throwable next = null) pure nothrow @safe
     {
         size_t tokenPosition = token.ptr - input.ptr;
         string msg = text("Token \"", token, "\" at position ", tokenPosition, " is undefined.");
-        super(msg);
+        super(msg, file, line, next);
     }
 }
 
 class UnexpectedElementException : Exception
 {
-    this(string input, string element, string expected) pure nothrow @safe
+    this(string input, string element, string expected, string file = __FILE__,
+            size_t line = __LINE__, Throwable next = null) pure nothrow @safe
     {
         size_t elementPosition = element.ptr - input.ptr;
         string msg = text("Element \"", element, "\" at position ",
                 elementPosition, " seems to be out of order. Expected: ", expected);
-        super(msg);
+        super(msg, file, line, next);
     }
 }
 
 class RepeatedNameException : Exception
 {
-    this(string input, string name) pure nothrow @safe
+    this(string input, string name, string file = __FILE__,
+            size_t line = __LINE__, Throwable next = null) pure nothrow @safe
     {
         size_t namePosition = name.ptr - input.ptr;
         string msg = text("Name \"", name, "\" at position ", namePosition, " was defined previously.");
-        super(msg);
+        super(msg, file, line, next);
     }
 }
 
@@ -230,13 +232,10 @@ unittest
     auto incomplete = "`fun` size = 1 `gun` size_max = // missing size";
     bool caughtException;
     try
-    {
         auto parser = new Parser(incomplete);
-    }
     catch (IncompleteMessageIdException e)
-    {
         caughtException = true;
-    }
+
     assert(caughtException);
 }
 
@@ -245,13 +244,10 @@ unittest
     auto duplicateName = "`foo` size = 42 `foo` size = 42";
     bool caughtException;
     try
-    {
         auto parser = new Parser(duplicateName);
-    }
     catch (RepeatedNameException e)
-    {
         caughtException = true;
-    }
+
     assert(caughtException);
 }
 
@@ -298,13 +294,9 @@ unittest
     bool caughtException;
     auto parser = new Parser(negativeSize, false);
     try
-    {
         parser.getNextSource();
-    }
     catch (UndefinedTokenException e)
-    {
         caughtException = true;
-    }
 
     assert(caughtException);
 }
@@ -338,6 +330,7 @@ unittest
         parser3.forwardToNextElement();
     catch (IncompleteMessageIdException e)
         caughtException = true;
+
     assert(caughtException);
 }
 
@@ -350,6 +343,7 @@ unittest
         parser.forwardToNextElement();
     catch (UndefinedTokenException e)
         caughtException = true;
+
     assert(caughtException);
 }
 
