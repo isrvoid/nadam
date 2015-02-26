@@ -1,7 +1,3 @@
-# Files and folders
-# ------------------------------------------------------------------------------
-todo
-
 # C, C++, D
 # ------------------------------------------------------------------------------
 # Object files
@@ -32,10 +28,8 @@ todo
 *.i*86
 *.x86_64
 
-# CMake
+# Files and folders
 # ------------------------------------------------------------------------------
-CMakeCache.txt
-CMakeFiles
-Makefile
-cmake_install.cmake
-install_manifest.txt
+todo
+typegen
+*_t
