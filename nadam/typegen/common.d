@@ -5,7 +5,15 @@ import std.conv : text;
 
 import nadam.types;
 
-class IncompleteMessageIdException : Exception
+abstract class ParserException : Exception
+{
+    this(string msg, string file, size_t line, Throwable next) pure nothrow @safe
+    {
+        super(msg, file, line, next);
+    }
+}
+
+class IncompleteMessageIdException : ParserException
 {
     this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) pure nothrow @safe
     {
@@ -15,7 +23,7 @@ class IncompleteMessageIdException : Exception
 }
 
 // TODO refactor input string position handling into its own type
-class UndefinedTokenException : Exception
+class UndefinedTokenException : ParserException
 {
     this(string input, string token, string file = __FILE__,
             size_t line = __LINE__, Throwable next = null) pure nothrow @safe
@@ -26,7 +34,7 @@ class UndefinedTokenException : Exception
     }
 }
 
-class UnexpectedElementException : Exception
+class UnexpectedElementException : ParserException
 {
     this(string input, string element, string expected, string file = __FILE__,
             size_t line = __LINE__, Throwable next = null) pure nothrow @safe
@@ -38,7 +46,7 @@ class UnexpectedElementException : Exception
     }
 }
 
-class RepeatedNameException : Exception
+class RepeatedNameException : ParserException
 {
     this(string input, string name, string file = __FILE__,
             size_t line = __LINE__, Throwable next = null) pure nothrow @safe
@@ -198,7 +206,7 @@ class Parser
 
         void put(MessageIdSource source) @safe
         {
-            ensureNameUniqueness(source.name);
+            ensureUniqueName(source.name);
             collector.put(source);
         }
 
@@ -211,7 +219,7 @@ class Parser
         auto collector = appender!(MessageIdSource[])();
         bool[string] repeatedNameGuard;
 
-        void ensureNameUniqueness(string name) @safe
+        void ensureUniqueName(string name) @safe
         {
             if (name in repeatedNameGuard)
                 throw new RepeatedNameException(input, name);
