@@ -123,7 +123,6 @@ class Parser
         return MessageIdSource(name, size);
     }
 
-    // TODO refactor duplicate get function's code
     string getName()
     {
         forwardToNextElement!false();
@@ -140,33 +139,44 @@ class Parser
 
     MessageSize getSize()
     {
-        import std.conv : to;
+        auto sizeKeyword = getSizeKeyword();
+        findEqualsSign();
+        auto sizeValue = getSizeValue();
 
-        // size keyword
+        bool isVariableSize = (sizeKeyword == "size_max");
+        return MessageSize(sizeValue, isVariableSize);
+    }
+
+    string getSizeKeyword()
+    {
         forwardToNextElement();
 
         auto sizeKeyword = front["sizeKeyword"];
         if (sizeKeyword == null)
             throw new UnexpectedElementException(input, front.hit, "size or size_max keyword");
 
-        // equals sign
+        return sizeKeyword;
+    }
+
+    void findEqualsSign()
+    {
         forwardToNextElement();
 
         if (front.hit != "=")
             throw new UnexpectedElementException(input, front.hit, "equals sign");
+    }
 
-        // size value
+    uint getSizeValue()
+    {
+        import std.conv : to;
+
         forwardToNextElement();
 
         auto sizeElement = front["digit"];
         if (sizeElement == null)
             throw new UnexpectedElementException(input, front.hit, "size value");
 
-        uint size = to!uint(sizeElement);
-
-        // result
-        bool isVariableSize = (sizeKeyword == "size_max");
-        return MessageSize(size, isVariableSize);
+        return to!uint(sizeElement);
     }
 
     void forwardToNextElement(bool throwAtInputsEnd = true)()
