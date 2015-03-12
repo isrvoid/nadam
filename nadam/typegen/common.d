@@ -82,7 +82,6 @@ class Parser
     this(string input)
     {
         this.input = toParse = input;
-        advanceFront();
         sources = getSources().idup;
     }
 
@@ -91,7 +90,6 @@ class Parser
         this(string input, bool parse)
         {
             this.input = toParse = input;
-            advanceFront();
             if (parse)
                 sources = getSources().idup;
         }
@@ -137,7 +135,6 @@ class Parser
             // also thrown if name is empty `` - fine for now
             throw new UnexpectedElementException(input, front.hit, "name");
 
-        advanceFront();
         return name;
     }
 
@@ -152,15 +149,11 @@ class Parser
         if (sizeKeyword == null)
             throw new UnexpectedElementException(input, front.hit, "size or size_max keyword");
 
-        advanceFront();
-
         // equals sign
         forwardToNextElement();
 
         if (front.hit != "=")
             throw new UnexpectedElementException(input, front.hit, "equals sign");
-
-        advanceFront();
 
         // size value
         forwardToNextElement();
@@ -169,7 +162,6 @@ class Parser
         if (sizeElement == null)
             throw new UnexpectedElementException(input, front.hit, "size value");
 
-        advanceFront();
         uint size = to!uint(sizeElement);
 
         // result
@@ -179,8 +171,10 @@ class Parser
 
     void forwardToNextElement(bool throwAtInputsEnd = true)()
     {
-        while (!front.empty && front["comment"] != null)
+        do
+        {
             advanceFront();
+        } while (!front.empty && front["comment"] != null);
 
         if (front.empty)
         {
@@ -308,6 +302,7 @@ unittest
     auto parser = new Parser(sequence, false);
     assert(parser.getNextSource() == MessageIdSource("fun", MessageSize(3)));
     assert(parser.getNextSource() == MessageIdSource("gun", MessageSize(7, true)));
+    assert(parser.getNextSource() == MessageIdSource.init);
     assert(parser.front.empty);
 }
 
