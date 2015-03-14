@@ -57,20 +57,20 @@ class RepeatedNameException : ParserException
     }
 }
 
-immutable
+enum : string
 {
-    auto commentPattern = `(?P<comment>/\*[^\*/]*\*/|//.*$)`;
-    auto namePattern = "`(?P<name>[^`]+)`";
-    auto sizeKeywordPattern = "(?P<sizeKeyword>size_max|size)";
-    auto equalsSignPattern = "=";
-    auto digitPattern = `(?P<digit>\d+)`;
-    auto undefinedTokenPattern = `(?P<undefined>\S+?)`;
+    commentPattern = `(?P<comment>/\*[^\*/]*\*/|//.*$)`,
+    namePattern = "`(?P<name>[^`]+)`",
+    sizeKeywordPattern = "(?P<sizeKeyword>size_max|size)",
+    equalsSignPattern = "=",
+    digitPattern = `(?P<digit>\d+)`,
+    undefinedTokenPattern = `(?P<undefined>\S+?)`,
 
-    auto parserPattern = commentPattern ~ '|' ~ namePattern ~ '|' ~ sizeKeywordPattern ~ '|' ~
-        equalsSignPattern ~ '|' ~ digitPattern ~ '|' ~ undefinedTokenPattern;
+    parserPattern = commentPattern ~ '|' ~ namePattern ~ '|' ~ sizeKeywordPattern ~ '|' ~
+        equalsSignPattern ~ '|' ~ digitPattern ~ '|' ~ undefinedTokenPattern
 }
 
-auto parserRegex = ctRegex!(parserPattern, "m");
+static parserRegex = ctRegex!(parserPattern, "m");
 
 void main(string[] args)
 {

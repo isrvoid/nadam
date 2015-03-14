@@ -1,19 +1,17 @@
-all: typegen
-
 DROOTDIR := nadam
 TYPEGENDIR := $(DROOTDIR)/typegen
 TYPEGENSRC := $(shell find $(TYPEGENDIR) -type f -name "*.d") $(DROOTDIR)/types.d
 
-DMDFLAGS := -O
-DMDTESTFLAGS := -unittest
+DFLAGS := -O -release -boundscheck=off
+DTESTFLAGS := -unittest
 
 all: typegen
 
 typegen: $(TYPEGENSRC)
-	@dmd $(TYPEGENSRC) -of$@ $(DMDFLAGS)
+	@dmd $(TYPEGENSRC) -of$@ $(DFLAGS)
 
 typegen_t: $(TYPEGENSRC)
-	@dmd $(TYPEGENSRC) -of$@ $(DMDTESTFLAGS)
+	@dmd $(TYPEGENSRC) -of$@ $(DTESTFLAGS)
 
 clean:
 	-@$(RM) $(wildcard *.o *_t.o *_t) typegen
