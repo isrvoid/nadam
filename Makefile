@@ -2,8 +2,18 @@ DROOTDIR := nadam
 TYPEGENDIR := $(DROOTDIR)/typegen
 TYPEGENSRC := $(shell find $(TYPEGENDIR) -type f -name "*.d") $(DROOTDIR)/types.d
 
+CROOTDIR := src
+CSRC := $(shell find $(CROOTDIR) -type f -name "*.c")
+
 DFLAGS := -O -release -boundscheck=off
 DTESTFLAGS := -unittest
+
+CWARNINGS := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align \
+	-Wwrite-strings -Wmissing-prototypes -Wmissing-declarations \
+	-Wredundant-decls -Wnested-externs -Winline -Wno-long-long \
+	-Wuninitialized -Wconversion -Wstrict-prototypes
+CFLAGS := -std=c11 -O3 $(CWARNINGS)
+CTESTFLAGS := -std=c11 $(CWARNINGS)
 
 all: typegen
 
@@ -13,10 +23,16 @@ typegen: $(TYPEGENSRC)
 typegen_t: $(TYPEGENSRC)
 	@dmd $(TYPEGENSRC) -of$@ $(DTESTFLAGS)
 
-clean:
-	-@$(RM) $(wildcard *.o *_t.o *_t) typegen
+nadamC: $(CSRC)
+	@$(CC) $(CSRC) $(CFLAGS) -o $@
 
-TESTFILES := typegen_t
+nadamC_t: $(CSRC)
+	@$(CC) $(CSRC) $(CTESTFLAGS) -o $@
+
+clean:
+	-@$(RM) $(wildcard *.o *_t.o *_t) typegen nadamC
+
+TESTFILES := typegen_t nadamC_t
 
 unittest: $(TESTFILES)
 	-@rc=0; count=0; \
