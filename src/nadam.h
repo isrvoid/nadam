@@ -32,7 +32,7 @@ typedef struct {
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);
-// after a delegate returns, memory pointed to by msg should be considered invalid
+// after recvDelegate returns, memory pointed to by msg should be considered invalid
 // size argument is intended for messages of variable size
 typedef void (*nadam_recvDelegate_t)(void *msg, uint32_t size, const nadam_messageInfo_t *messageInfo);
 
@@ -49,7 +49,7 @@ typedef void (*nadam_errorDelegate_t)(int error);
  * by message type generator utility, but is ignored in this implementation.
  */
 
-// infoList memory shouldn't be freed until after nadam_initiate() call
+// messageInfos will be used continuously - probably shold be static const
 int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageInfoCount, size_t hashLengthMin);
 
 // if the delegate for a message type is not set, messages of this type are ignored (dumped)
