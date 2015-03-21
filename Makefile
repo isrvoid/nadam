@@ -25,7 +25,7 @@ typegen_t: $(TYPEGENSRC)
 	@dmd $(TYPEGENSRC) -of$@ $(DTESTFLAGS)
 
 nadamc: $(NADAMCSRC)
-	@$(CC) $(NADAMCSRC) $(CFLAGS) -o nadam
+	@$(CC) $(NADAMCSRC) $(CFLAGS) -o $@
 
 nadamc_t: nadamc_t.c
 	@$(CC) $(NADAMCTESTSRC) $< $(CTESTFLAGS) -o $@

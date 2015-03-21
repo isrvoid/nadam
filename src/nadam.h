@@ -19,16 +19,15 @@ typedef struct {
     uint8_t hash[20];
 } nadam_messageInfo_t;
 
-#define NADAM_ERROR_EMPTY_MESSAGE_INFOS -1
-#define NADAM_ERROR_HASH_LENGTH -2
-#define NADAM_ERROR_UNKNOWN_NAME -3
-#define NADAM_ERROR_NAME_COLLISION -4
-#define NADAM_ERROR_HASH_COLLISION -5
+#define NADAM_ERROR_UNKNOWN_NAME 300
+#define NADAM_ERROR_EMPTY_MESSAGE_INFOS 301
+#define NADAM_ERROR_HASH_LENGTH_MIN 302
+#define NADAM_ERROR_NAME_COLLISION 303
 // errors passed to the error delegate
-#define NADAM_ERROR_HASH_LENGTH_HANDSHAKE -6
-#define NADAM_ERROR_CONNECTION_CLOSED -7
-#define NADAM_ERROR_UNKNOWN_HASH -8
-#define NADAM_ERROR_VARIABLE_SIZE -9
+#define NADAM_ERROR_HASH_LENGTH_HANDSHAKE 500
+#define NADAM_ERROR_CONNECTION_CLOSED 501
+#define NADAM_ERROR_UNKNOWN_HASH 502
+#define NADAM_ERROR_VARIABLE_SIZE 503
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);
@@ -37,16 +36,23 @@ typedef int (*nadam_recv_t)(void *dest, uint32_t n);
 typedef void (*nadam_recvDelegate_t)(void *msg, uint32_t size, const nadam_messageInfo_t *messageInfo);
 
 // if the error delegate gets called, no new messages will be received (the connection should be closed)
+// errno won't be overwritten (check error argument instead)
 typedef void (*nadam_errorDelegate_t)(int error);
 
 /*
+ * Functions return 0 on success and -1 on error.
+ * If -1 is returned, errno will contain the specific number.
+ *
  * Modern languages shouldn't care about a string being zero terminated.
  * To make C implementation fully compliant, one would need to pass the length with every name.
  * That would be painful, therefore the follwing compromise was made:
  * name's length is assumed to be the index of first '\0'.
  * The limitation of this is that all names truncated at first '\0' have to be unique.
- * nadam_init() would fail otherwise. nameLength in nadam_messageInfo_t is endowed
- * by message type generator utility, but is ignored in this implementation.
+ * nadam_init() will test for it. Barring that, messageInfos argument is expected to be correct.
+ * Otherwise, the behaviour is undefined.
+ *
+ * nameLength in nadam_messageInfo_t is endowed
+ * by message info generator utility, but is ignored in this implementation.
  */
 
 // messageInfos will be used continuously - probably shold be static const
