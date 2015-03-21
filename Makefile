@@ -3,7 +3,8 @@ TYPEGENDIR := $(DROOTDIR)/typegen
 TYPEGENSRC := $(shell find $(TYPEGENDIR) -type f -name "*.d") $(DROOTDIR)/types.d
 
 CROOTDIR := src
-CSRC := $(shell find $(CROOTDIR) -type f -name "*.c")
+NADAMCSRC := $(shell find $(CROOTDIR) -type f -name "*.c")
+NADAMCTESTSRC := $(NADAMCSRC)
 
 DFLAGS := -O -release -boundscheck=off
 DTESTFLAGS := -unittest
@@ -13,7 +14,7 @@ CWARNINGS := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align \
 	-Wredundant-decls -Wnested-externs -Winline -Wno-long-long \
 	-Wuninitialized -Wconversion -Wstrict-prototypes
 CFLAGS := -std=c11 -O3 $(CWARNINGS)
-CTESTFLAGS := -std=c11 $(CWARNINGS)
+CTESTFLAGS := -std=c11 -O1 $(CWARNINGS) -DTESTING
 
 all: typegen
 
@@ -23,18 +24,21 @@ typegen: $(TYPEGENSRC)
 typegen_t: $(TYPEGENSRC)
 	@dmd $(TYPEGENSRC) -of$@ $(DTESTFLAGS)
 
-nadamC: $(CSRC)
-	@$(CC) $(CSRC) $(CFLAGS) -o $@
+nadamc: $(NADAMCSRC)
+	@$(CC) $(NADAMCSRC) $(CFLAGS) -o nadam
 
-nadamC_t: $(CSRC)
-	@$(CC) $(CSRC) $(CTESTFLAGS) -o $@
+nadamc_t: nadamc_t.c
+	@$(CC) $(NADAMCTESTSRC) $< $(CTESTFLAGS) -o $@
+
+nadamc_t.c: $(NADAMCTESTSRC)
+	@testgen $(NADAMCTESTSRC) -of$@
 
 clean:
-	-@$(RM) $(wildcard *.o *_t.o *_t) typegen nadamC
+	-@$(RM) $(wildcard *.o *_t.o *_t typegen nadamc nadam_t.c)
 
-TESTFILES := typegen_t nadamC_t
+TESTFILES := typegen_t
 
-unittest: $(TESTFILES)
+testAll: $(TESTFILES)
 	-@rc=0; count=0; \
 		for file in $(TESTFILES); do \
 		echo " TEST      $$file"; ./$$file; \
@@ -44,4 +48,4 @@ unittest: $(TESTFILES)
 
 AUXFILES := Makefile README.md
 
-.PHONY: all clean unittest todolist
+.PHONY: all clean todolist
