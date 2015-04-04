@@ -59,7 +59,7 @@ class RepeatedNameException : ParserException
 
 enum : string
 {
-    commentPattern = `(?P<comment>/\*[^\*/]*\*/|//.*$)`,
+    commentPattern = `(?P<comment>/\*.*?\*/|//.*$)`,
     namePattern = "`(?P<name>[^`]+)`",
     sizeKeywordPattern = "(?P<sizeKeyword>size_max|size)",
     equalsSignPattern = "=",
@@ -246,7 +246,7 @@ unittest
 {
     import std.algorithm;
 
-    auto sequence = "/* the quick */`foo`size// brown fox\r\n =\n
+    auto sequence = "/* /* the* / quick */`foo`size// brown fox\r\n =\n
         /* jumpes over */42`bar`\n// the lazy dog\nsize_max=\r\n123";
 
     auto parser = new Parser(sequence);
@@ -282,7 +282,7 @@ unittest
 // getNextSource
 unittest
 {
-    auto commentsOnly = "// the quick brown fox\n/* jumps over the lazy dog */";
+    auto commentsOnly = "/**/// the quick brown fox\n/* jumps over the lazy dog */";
     auto parser = new Parser(commentsOnly, false);
 
     assert(parser.getNextSource() == MessageIdSource.init);
