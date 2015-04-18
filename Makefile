@@ -4,7 +4,6 @@ TYPEGENSRC := $(shell find $(TYPEGENDIR) -type f -name "*.d") $(DROOTDIR)/types.
 
 CROOTDIR := src
 NADAMCSRC := $(shell find $(CROOTDIR) -type f -name "*.c")
-NADAMCTESTSRC := $(NADAMCSRC)
 
 DFLAGS := -O -release -boundscheck=off
 DTESTFLAGS := -unittest
@@ -14,7 +13,7 @@ CWARNINGS := -Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align \
 	-Wredundant-decls -Wnested-externs -Winline -Wno-long-long \
 	-Wuninitialized -Wconversion -Wstrict-prototypes
 CFLAGS := -std=c11 -O3 $(CWARNINGS)
-CTESTFLAGS := -std=c11 -O1 $(CWARNINGS) -DTESTING
+CTESTFLAGS := -std=c11 -O1 $(CWARNINGS) -DUNITTEST
 
 all: typegen
 
@@ -28,15 +27,15 @@ nadamc: $(NADAMCSRC)
 	@$(CC) $(NADAMCSRC) $(CFLAGS) -o $@
 
 nadamc_t: nadamc_t.c
-	@$(CC) $(NADAMCTESTSRC) $< $(CTESTFLAGS) -o $@
+	@$(CC) $(NADAMCSRC) $< $(CTESTFLAGS) -o $@
 
-nadamc_t.c: $(NADAMCTESTSRC)
-	@testgen $(NADAMCTESTSRC) -of$@
+nadamc_t.c: $(NADAMCSRC)
+	@gendsu $(NADAMCSRC) -of$@
 
 clean:
 	-@$(RM) $(wildcard *.o *_t.o *_t typegen nadamc nadam_t.c)
 
-TESTFILES := typegen_t
+TESTFILES := typegen_t nadamc_t
 
 testAll: $(TESTFILES)
 	-@rc=0; count=0; \
