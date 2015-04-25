@@ -7,6 +7,8 @@
 
 #include <search.h>
 
+#include "unittestMacros.h"
+
 struct nadamMember {
     struct hsearch_data nameKeyHtab;
     struct hsearch_data hashKeyHtab;
@@ -104,3 +106,12 @@ static int fillNameMap(void) {
     return 0;
 }
 
+// unittest
+// -----------------------------------------------------------------------------
+#ifdef UNITTEST
+// FIXME remove
+int dummyTest(void) {
+    ASSERT(true);
+    return 0;
+}
+#endif
