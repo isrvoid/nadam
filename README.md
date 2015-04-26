@@ -1,5 +1,4 @@
 ## Nadam - Named Data Messaging
-### About
 Nadam is a definition rather than a library. Any transmitted message has to be known to both communicating sides.
 Not every participant needs to be aware of all existing message types.
 1:n server:clients arrangement is possible, where a client communicates using only a subset of available messages.
@@ -53,22 +52,16 @@ TODO example of pragma messages
 ### Type generator utility
 Type generator program should aleviate the need to implement own message type generator for every language.
 
-For C/C++ it creates a simple interface that allowes to iterate through generated types. Queried type would look
-something like this:
+For C/C++ it creates a plug-in file containing an array of following type:
 ```c
-typedef struct {
-    uint8_t hash[20];
-    bool isVariableSize;
-    uint32_t size;
-} nadam_messageId_t;
-
 typedef struct {
     const char* name;
     size_t nameLength;
-    nadam_messageId_t id;
-} nadam_namedMessageId_t;
+    nadam_messageSize_t size;
+    uint8_t hash[20];
+} nadam_messageInfo_t;
 ```
-Types should be connected to their names using a hash map for faster lookup. Hash calculations could be cached.
+Those infos should be put into a hash map for faster lookup. Hash calculations could be cached.
 
 Input to the generator is a simple text file containing message type definitions.
 Message is defined with a name followed by length.
