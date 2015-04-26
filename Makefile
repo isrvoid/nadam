@@ -10,7 +10,9 @@ DFLAGS := -release -O -boundscheck=off
 DTESTFLAGS := -unittest
 
 CC := clang
-CWARNINGS := -Weverything
+# FIXME remove -Wno-unused-parameter if functions are implemented
+CWARNINGS := -Weverything -Wno-padded -Wno-unused-parameter -Wno-reserved-id-macro \
+	-Wno-unused-function
 COMMON_CFLAGS := -std=c11 $(CWARNINGS) -I$(CINCLUDEDIR)
 CFLAGS := $(COMMON_CFLAGS) -O3
 CFLAGS_T := $(COMMON_CFLAGS) -O1 -Wno-missing-prototypes -DUNITTEST

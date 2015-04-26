@@ -1,17 +1,18 @@
-#define _GNU_SOURCE
-
 #include "nadam.h"
 
 #include <errno.h>
 #include <assert.h>
 
-#include <search.h>
+#include "khash.h"
 
 #include "unittestMacros.h"
 
+KHASH_MAP_INIT_INT(m32, size_t)
+KHASH_MAP_INIT_STR(mStr, size_t)
+
 struct nadamMember {
-    struct hsearch_data nameKeyHtab;
-    struct hsearch_data hashKeyHtab;
+    khash_t(mStr) *nameKeyMap;
+    khash_t(m32) *hashKeyMap;
 
     const nadam_messageInfo_t *messageInfos;
     size_t messageCount;
@@ -21,7 +22,8 @@ struct nadamMember {
 // private declarations
 // -----------------------------------------------------------------------------
 static int testInitIn(size_t infoCount, size_t hashLengthMin);
-static void cleanHtabs(void);
+static void initMaps(void);
+static void destroyMaps(void);
 static int fillNameMap(void);
 
 static struct nadamMember nadam;
@@ -36,10 +38,8 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
     nadam.messageCount = messageCount;
     nadam.hashLength = hashLengthMin;
 
-    cleanHtabs();
-
-    bool success = hcreate_r(messageCount, &nadam.nameKeyHtab);
-    assert(success);
+    destroyMaps();
+    initMaps();
 
     return fillNameMap();
 }
@@ -72,7 +72,10 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
         return -1;
     }
 
-    if (hashLengthMin < 1 || hashLengthMin > 20) {
+    /* For initial implementation let's assume that
+       all hashes can be uniquely distinguished by the first 4 bytes
+       TODO extension for lengths (4,8] with uint64_t keys  */
+    if (hashLengthMin == 0 || hashLengthMin > 4) {
         errno = NADAM_ERROR_HASH_LENGTH_MIN;
         return -1;
     }
@@ -80,27 +83,32 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
     return 0;
 }
 
-static void cleanHtabs(void) {
-    static const struct hsearch_data zeroHtab = { 0 };
+static void initMaps(void) {
+    nadam.nameKeyMap = kh_init(mStr);
+    nadam.hashKeyMap = kh_init(m32);
+}
 
-    hdestroy_r(&nadam.nameKeyHtab);
-    nadam.nameKeyHtab = zeroHtab;
-    hdestroy_r(&nadam.hashKeyHtab);
-    nadam.hashKeyHtab = zeroHtab;
+static void destroyMaps(void) {
+    kh_destroy(mStr, nadam.nameKeyMap);
+    nadam.nameKeyMap = NULL;
+    kh_destroy(m32, nadam.hashKeyMap);
+    nadam.hashKeyMap = NULL;
 }
 
 static int fillNameMap(void) {
     for (size_t i = 0; i < nadam.messageCount; i++) {
-        const nadam_messageInfo_t *mip = &nadam.messageInfos[i];
-        ENTRY *ep, e = { .key = (char *) mip->name, .data = (void *) mip };
+        const nadam_messageInfo_t *mi = nadam.messageInfos + i;
+        int ret;
+        khiter_t k = kh_put(mStr, nadam.nameKeyMap, mi->name, &ret);
+        assert(ret != -1);
 
-        bool success = hsearch_r(e, ENTER, &ep, &nadam.nameKeyHtab);
-        assert(success);
-
-        if (e.data != ep->data) {
+        bool keyWasPresent = !ret;
+        if (keyWasPresent) {
             errno = NADAM_ERROR_NAME_COLLISION;
             return -1;
         }
+
+        kh_val(nadam.nameKeyMap, k) = i;
     }
 
     return 0;
@@ -109,9 +117,41 @@ static int fillNameMap(void) {
 // unittest
 // -----------------------------------------------------------------------------
 #ifdef UNITTEST
-// FIXME remove
-int dummyTest(void) {
-    ASSERT(true);
+// nadam_init
+int initWithPlausibleArgs(void) {
+    nadam_messageInfo_t infos[] = { { .name = "foo", .nameLength = 3 }, 
+        { .name = "funhun", .nameLength = 6 } };
+    errno = 0;
+    ASSERT(!nadam_init(infos, 2, 4));
+    ASSERT(!errno);
     return 0;
 }
+
+int initWithEmptyMessageInfos(void) {
+    errno = 0;
+    ASSERT(nadam_init(NULL, 0, 4));
+    ASSERT(errno == NADAM_ERROR_EMPTY_MESSAGE_INFOS);
+    return 0;
+}
+
+int initWithWrongHashLength(void) {
+    nadam_messageInfo_t info = { .name = "foo", .nameLength = 3 };
+    errno = 0;
+    ASSERT(nadam_init(&info, 1, 0));
+    ASSERT(errno == NADAM_ERROR_HASH_LENGTH_MIN);
+    errno = 0;
+    ASSERT(nadam_init(&info, 1, 9));
+    ASSERT(errno == NADAM_ERROR_HASH_LENGTH_MIN);
+    return 0;
+}
+
+int initWithDuplicateName(void) {
+    nadam_messageInfo_t infos[] = { { .name = "foo", .nameLength = 3 }, 
+        { .name = "foo", .nameLength = 3 } };
+    errno = 0;
+    ASSERT(nadam_init(infos, 2, 4));
+    ASSERT(errno == NADAM_ERROR_NAME_COLLISION);
+    return 0;
+}
+
 #endif

@@ -39,23 +39,21 @@ typedef void (*nadam_recvDelegate_t)(void *msg, uint32_t size, const nadam_messa
 // errno won't be overwritten (check error argument instead)
 typedef void (*nadam_errorDelegate_t)(int error);
 
-/*
- * Functions return 0 on success and -1 on error.
- * If -1 is returned, errno will contain the specific number.
- *
- * Modern languages shouldn't care about a string being zero terminated.
- * To make C implementation fully compliant, one would need to pass the length with every name.
- * That would be painful, therefore the follwing compromise was made:
- * name's length is assumed to be the index of first '\0'.
- * The limitation of this is that all names truncated at first '\0' have to be unique.
- * nadam_init() will test for it. Barring that, messageInfos argument is expected to be correct.
- * Otherwise, the behaviour is undefined.
- *
- * nameLength in nadam_messageInfo_t is endowed
- * by message info generator utility, but is ignored in this implementation.
- */
+/* Functions return 0 on success and -1 on error.
+   If -1 is returned, errno will contain the specific value.  */
+  
+/* Modern languages shouldn't care about a string being zero terminated.
+   To make C implementation fully compliant, one would need to pass the length with every name.
+   That would be painful, therefore the follwing compromise was made:
+   name's length is assumed to be the index of first '\0'.
+   The limitation of this is that all names truncated at first '\0' have to be unique.
+   nadam_init() will test for it. Barring that, messageInfos argument is expected to be correct.
+   Otherwise, the behaviour is undefined.
+  
+   nameLength in nadam_messageInfo_t is endowed
+   by message info generator utility, but is ignored in this implementation.  */
 
-// messageInfos will be used continuously - probably shold be static const
+// messageInfos will be used continuously - should be unlimited lifetime const
 int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageInfoCount, size_t hashLengthMin);
 
 // if the delegate for a message type is not set, messages of this type are ignored (dumped)
@@ -65,11 +63,9 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
 
 // size argument is ignored for constant size messages
 int nadam_send(const char *name, const void *msg, uint32_t size);
-/*
- * Calling this send version (Send With Immutable Name) promises, that the name is a string literal or memory,
- * whose content won't change throughout the life of the program - allowes name lookup caching.
- */
+/* Calling this send version (Send With Immutable Name) promises
+   that the name is a string literal or memory,
+   whose content won't change throughout the life of the program - allows name lookup caching.  */
 int nadam_sendWin(const char *name, const void *msg, uint32_t size);
 
 void nadam_stop(void);
-
