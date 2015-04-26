@@ -1,3 +1,7 @@
+/*
+Copyright:  Copyright Johannes Teichrieb 2015
+License:    opensource.org/licenses/MIT
+*/
 #include "nadam.h"
 
 #include <errno.h>

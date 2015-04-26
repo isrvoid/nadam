@@ -1,3 +1,7 @@
+/*
+Copyright:  Copyright Johannes Teichrieb 2015
+License:    opensource.org/licenses/MIT
+*/
 module nadam.typegen.common;
 
 import std.regex;
