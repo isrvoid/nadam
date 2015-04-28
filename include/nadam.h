@@ -23,12 +23,14 @@ typedef struct {
     uint8_t hash[20];
 } nadam_messageInfo_t;
 
+// errors returned by interface functions
 #define NADAM_ERROR_UNKNOWN_NAME 300
 #define NADAM_ERROR_EMPTY_MESSAGE_INFOS 301
-#define NADAM_ERROR_HASH_LENGTH_MIN 302
+#define NADAM_ERROR_MIN_HASH_LENGTH 302
 #define NADAM_ERROR_NAME_COLLISION 303
+#define NADAM_ERROR_MALLOC_FAILED 304
 // errors passed to the error delegate
-#define NADAM_ERROR_HASH_LENGTH_HANDSHAKE 500
+#define NADAM_ERROR_HANDSHAKE_HASH_LENGTH 500
 #define NADAM_ERROR_CONNECTION_CLOSED 501
 #define NADAM_ERROR_UNKNOWN_HASH 502
 #define NADAM_ERROR_VARIABLE_SIZE 503
@@ -57,7 +59,7 @@ typedef void (*nadam_errorDelegate_t)(int error);
    nameLength in nadam_messageInfo_t is endowed
    by message info generator utility, but is ignored in this implementation.  */
 
-// messageInfos will be used continuously - should be unlimited lifetime const
+// messageInfos will be used continuously - it should be unlimited lifetime const
 int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageInfoCount, size_t hashLengthMin);
 
 // if the delegate for a message type is not set, messages of this type are ignored (dumped)

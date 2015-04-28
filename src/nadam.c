@@ -18,16 +18,23 @@ struct nadamMember {
     khash_t(mStr) *nameKeyMap;
     khash_t(m32) *hashKeyMap;
 
+    void *recvBuffer;
+    nadam_recvDelegate_t *delegates;
+
     const nadam_messageInfo_t *messageInfos;
     size_t messageCount;
     size_t hashLength;
+
+    nadam_errorDelegate_t errorDelegate;
 };
 
 // private declarations
 // -----------------------------------------------------------------------------
 static int testInitIn(size_t infoCount, size_t hashLengthMin);
+static void freeMembers(void);
+static int allocate(void **dest, size_t size);
+static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
-static void destroyMaps(void);
 static int fillNameMap(void);
 
 static struct nadamMember nadam;
@@ -38,11 +45,18 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
     if (testInitIn(messageCount, hashLengthMin))
         return -1;
 
+    freeMembers();
+
     nadam.messageInfos = messageInfos;
     nadam.messageCount = messageCount;
     nadam.hashLength = hashLengthMin;
 
-    destroyMaps();
+    if (allocate(&nadam.recvBuffer, getMaxMessageSize()))
+        return -1;
+
+    if (allocate((void **) &nadam.delegates, sizeof(nadam_recvDelegate_t) * messageCount))
+        return -1;
+
     initMaps();
 
     return fillNameMap();
@@ -80,23 +94,47 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
        all hashes can be uniquely distinguished by the first 4 bytes
        TODO extension for lengths (4,8] with uint64_t keys  */
     if (hashLengthMin == 0 || hashLengthMin > 4) {
-        errno = NADAM_ERROR_HASH_LENGTH_MIN;
+        errno = NADAM_ERROR_MIN_HASH_LENGTH;
         return -1;
     }
 
     return 0;
 }
 
+static void freeMembers(void) {
+    kh_destroy(mStr, nadam.nameKeyMap);
+    kh_destroy(m32, nadam.hashKeyMap);
+    free(nadam.recvBuffer);
+    free(nadam.delegates);
+    // nadam.messageInfos are not ours to free
+
+    memset(&nadam, 0, sizeof(nadam));
+}
+
+static int allocate(void **dest, size_t size) {
+    *dest = malloc(size);
+    if (!*dest) {
+        errno = NADAM_ERROR_MALLOC_FAILED;
+        return -1;
+    }
+    return 0;
+}
+
+static uint32_t getMaxMessageSize(void) {
+    assert(nadam.messageCount);
+
+    uint32_t maxSize = 0;
+    for (size_t i = 0; i < nadam.messageCount; ++i) {
+        uint32_t currentSize = nadam.messageInfos[i].size.total;
+        if (currentSize > maxSize)
+            maxSize = currentSize;
+    }
+    return maxSize;
+}
+
 static void initMaps(void) {
     nadam.nameKeyMap = kh_init(mStr);
     nadam.hashKeyMap = kh_init(m32);
-}
-
-static void destroyMaps(void) {
-    kh_destroy(mStr, nadam.nameKeyMap);
-    nadam.nameKeyMap = NULL;
-    kh_destroy(m32, nadam.hashKeyMap);
-    nadam.hashKeyMap = NULL;
 }
 
 static int fillNameMap(void) {
@@ -142,10 +180,10 @@ int initWithWrongHashLength(void) {
     nadam_messageInfo_t info = { .name = "foo", .nameLength = 3 };
     errno = 0;
     ASSERT(nadam_init(&info, 1, 0));
-    ASSERT(errno == NADAM_ERROR_HASH_LENGTH_MIN);
+    ASSERT(errno == NADAM_ERROR_MIN_HASH_LENGTH);
     errno = 0;
     ASSERT(nadam_init(&info, 1, 9));
-    ASSERT(errno == NADAM_ERROR_HASH_LENGTH_MIN);
+    ASSERT(errno == NADAM_ERROR_MIN_HASH_LENGTH);
     return 0;
 }
 
