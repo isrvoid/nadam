@@ -25,6 +25,9 @@ struct nadamMember {
     size_t messageCount;
     size_t hashLength;
 
+    nadam_send_t send;
+    nadam_recv_t recv;
+
     nadam_errorDelegate_t errorDelegate;
 };
 
@@ -64,6 +67,10 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
 
 // FIXME dummies
 int nadam_setDelegate(const char *name, nadam_recvDelegate_t delegate) {
+    return 0;
+}
+
+int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate, void *buffer) {
     return 0;
 }
 

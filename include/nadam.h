@@ -29,11 +29,11 @@ typedef struct {
 #define NADAM_ERROR_MIN_HASH_LENGTH 302
 #define NADAM_ERROR_NAME_COLLISION 303
 #define NADAM_ERROR_MALLOC_FAILED 304
+#define NADAM_ERROR_HANDSHAKE_HASH_LENGTH 305
 // errors passed to the error delegate
-#define NADAM_ERROR_HANDSHAKE_HASH_LENGTH 500
-#define NADAM_ERROR_CONNECTION_CLOSED 501
-#define NADAM_ERROR_UNKNOWN_HASH 502
-#define NADAM_ERROR_VARIABLE_SIZE 503
+#define NADAM_ERROR_CONNECTION_CLOSED 500
+#define NADAM_ERROR_UNKNOWN_HASH 501
+#define NADAM_ERROR_VARIABLE_SIZE 502
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);
@@ -63,7 +63,8 @@ typedef void (*nadam_errorDelegate_t)(int error);
 int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageInfoCount, size_t hashLengthMin);
 
 // if the delegate for a message type is not set, messages of this type are ignored (dumped)
-int nadam_setDelegate(const char *name, nadam_recvDelegate_t delegate);
+int nadam_setDelegate(const char *msgName, nadam_recvDelegate_t delegate);
+int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate, void *buffer);
 
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate);
 
