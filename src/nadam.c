@@ -47,7 +47,7 @@ static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
 
-static struct nadamMembers nadam;
+static struct nadamMembers mbr;
 
 // interface functions
 // -----------------------------------------------------------------------------
@@ -56,11 +56,11 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
         return -1;
 
     freeMembers();
-    memset(&nadam, 0, sizeof(nadam));
+    memset(&mbr, 0, sizeof(mbr));
 
-    nadam.messageInfos = messageInfos;
-    nadam.messageCount = messageCount;
-    nadam.hashLength = hashLengthMin;
+    mbr.messageInfos = messageInfos;
+    mbr.messageCount = messageCount;
+    mbr.hashLength = hashLengthMin;
 
     if (allocateMembers())
         return -1;
@@ -71,7 +71,7 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
 }
 
 int nadam_setDelegate(const char *msgName, nadam_recvDelegate_t delegate) {
-    return nadam_setDelegateWithRecvBuffer(msgName, delegate, nadam.commonRecvBuffer, NULL);
+    return nadam_setDelegateWithRecvBuffer(msgName, delegate, mbr.commonRecvBuffer, NULL);
 }
 
 // FIXME dummies
@@ -117,18 +117,18 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
 }
 
 static void freeMembers(void) {
-    kh_destroy(mStr, nadam.nameKeyMap);
-    kh_destroy(m32, nadam.hashKeyMap);
-    free(nadam.commonRecvBuffer);
-    free(nadam.delegates);
-    // nadam.messageInfos are not ours to free
+    kh_destroy(mStr, mbr.nameKeyMap);
+    kh_destroy(m32, mbr.hashKeyMap);
+    free(mbr.commonRecvBuffer);
+    free(mbr.delegates);
+    // messageInfos are not ours to free
 }
 
 static int allocateMembers(void) {
-    if (allocate(&nadam.commonRecvBuffer, getMaxMessageSize()))
+    if (allocate(&mbr.commonRecvBuffer, getMaxMessageSize()))
         return -1;
 
-    if (allocate((void **) &nadam.delegates, sizeof(recvDelegateRelated_t) * nadam.messageCount))
+    if (allocate((void **) &mbr.delegates, sizeof(recvDelegateRelated_t) * mbr.messageCount))
         return -1;
 
     return 0;
@@ -145,8 +145,8 @@ static int allocate(void **dest, size_t size) {
 
 static uint32_t getMaxMessageSize(void) {
     uint32_t maxSize = 0;
-    for (size_t i = 0; i < nadam.messageCount; ++i) {
-        uint32_t currentSize = nadam.messageInfos[i].size.total;
+    for (size_t i = 0; i < mbr.messageCount; ++i) {
+        uint32_t currentSize = mbr.messageInfos[i].size.total;
         if (currentSize > maxSize)
             maxSize = currentSize;
     }
@@ -154,15 +154,15 @@ static uint32_t getMaxMessageSize(void) {
 }
 
 static void initMaps(void) {
-    nadam.nameKeyMap = kh_init(mStr);
-    nadam.hashKeyMap = kh_init(m32);
+    mbr.nameKeyMap = kh_init(mStr);
+    mbr.hashKeyMap = kh_init(m32);
 }
 
 static int fillNameMap(void) {
-    for (size_t i = 0; i < nadam.messageCount; i++) {
-        const nadam_messageInfo_t *mi = nadam.messageInfos + i;
+    for (size_t i = 0; i < mbr.messageCount; i++) {
+        const nadam_messageInfo_t *mi = mbr.messageInfos + i;
         int ret;
-        khiter_t k = kh_put(mStr, nadam.nameKeyMap, mi->name, &ret);
+        khiter_t k = kh_put(mStr, mbr.nameKeyMap, mi->name, &ret);
         assert(ret != -1);
 
         bool keyWasPresent = !ret;
@@ -171,7 +171,7 @@ static int fillNameMap(void) {
             return -1;
         }
 
-        kh_val(nadam.nameKeyMap, k) = i;
+        kh_val(mbr.nameKeyMap, k) = i;
     }
 
     return 0;
