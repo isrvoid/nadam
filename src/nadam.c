@@ -14,12 +14,18 @@ License:    opensource.org/licenses/MIT
 KHASH_MAP_INIT_INT(m32, size_t)
 KHASH_MAP_INIT_STR(mStr, size_t)
 
-struct nadamMember {
+typedef struct {
+    nadam_recvDelegate_t delegate;
+    void *recvBuffer;
+    volatile bool *recvStart;
+} recvDelegateRelated_t;
+
+struct nadamMembers {
     khash_t(mStr) *nameKeyMap;
     khash_t(m32) *hashKeyMap;
 
-    void *recvBuffer;
-    nadam_recvDelegate_t *delegates;
+    void *commonRecvBuffer;
+    recvDelegateRelated_t *delegates;
 
     const nadam_messageInfo_t *messageInfos;
     size_t messageCount;
@@ -35,12 +41,13 @@ struct nadamMember {
 // -----------------------------------------------------------------------------
 static int testInitIn(size_t infoCount, size_t hashLengthMin);
 static void freeMembers(void);
+static int allocateMembers(void);
 static int allocate(void **dest, size_t size);
 static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
 
-static struct nadamMember nadam;
+static struct nadamMembers nadam;
 
 // interface functions
 // -----------------------------------------------------------------------------
@@ -49,15 +56,13 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
         return -1;
 
     freeMembers();
+    memset(&nadam, 0, sizeof(nadam));
 
     nadam.messageInfos = messageInfos;
     nadam.messageCount = messageCount;
     nadam.hashLength = hashLengthMin;
 
-    if (allocate(&nadam.recvBuffer, getMaxMessageSize()))
-        return -1;
-
-    if (allocate((void **) &nadam.delegates, sizeof(nadam_recvDelegate_t) * messageCount))
+    if (allocateMembers())
         return -1;
 
     initMaps();
@@ -65,12 +70,15 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
     return fillNameMap();
 }
 
-// FIXME dummies
-int nadam_setDelegate(const char *name, nadam_recvDelegate_t delegate) {
-    return 0;
+int nadam_setDelegate(const char *msgName, nadam_recvDelegate_t delegate) {
+    return nadam_setDelegateWithRecvBuffer(msgName, delegate, nadam.commonRecvBuffer, NULL);
 }
 
-int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate, void *buffer) {
+// FIXME dummies
+int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate,
+        void *buffer, volatile bool *recvStart) {
+    assert(buffer);
+
     return 0;
 }
 
@@ -111,11 +119,19 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
 static void freeMembers(void) {
     kh_destroy(mStr, nadam.nameKeyMap);
     kh_destroy(m32, nadam.hashKeyMap);
-    free(nadam.recvBuffer);
+    free(nadam.commonRecvBuffer);
     free(nadam.delegates);
     // nadam.messageInfos are not ours to free
+}
 
-    memset(&nadam, 0, sizeof(nadam));
+static int allocateMembers(void) {
+    if (allocate(&nadam.commonRecvBuffer, getMaxMessageSize()))
+        return -1;
+
+    if (allocate((void **) &nadam.delegates, sizeof(recvDelegateRelated_t) * nadam.messageCount))
+        return -1;
+
+    return 0;
 }
 
 static int allocate(void **dest, size_t size) {
@@ -128,8 +144,6 @@ static int allocate(void **dest, size_t size) {
 }
 
 static uint32_t getMaxMessageSize(void) {
-    assert(nadam.messageCount);
-
     uint32_t maxSize = 0;
     for (size_t i = 0; i < nadam.messageCount; ++i) {
         uint32_t currentSize = nadam.messageInfos[i].size.total;
@@ -203,4 +217,15 @@ int initWithDuplicateName(void) {
     return 0;
 }
 
+// allocate
+int tryToAllocateSmallAmountOfMemory(void) {
+    void *mem = NULL;
+    int error = allocate(&mem, 42);
+    free(mem);
+
+    ASSERT(!error);
+    ASSERT(mem);
+
+    return 0;
+}
 #endif

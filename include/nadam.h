@@ -37,8 +37,9 @@ typedef struct {
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);
-// after recvDelegate returns, memory pointed to by msg should be considered invalid
-// size argument is intended for messages of variable size
+/* After recvDelegate returns, memory pointed to by msg should be considered invalid
+   unless own buffer was provided with nadam_setDelegateWithRecvBuffer().
+   Size parmeter will provide the actual size of a variable size message.  */
 typedef void (*nadam_recvDelegate_t)(void *msg, uint32_t size, const nadam_messageInfo_t *messageInfo);
 
 // if the error delegate gets called, no new messages will be received (the connection should be closed)
@@ -62,9 +63,13 @@ typedef void (*nadam_errorDelegate_t)(int error);
 // messageInfos will be used continuously - it should be unlimited lifetime const
 int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageInfoCount, size_t hashLengthMin);
 
-// if the delegate for a message type is not set, messages of this type are ignored (dumped)
+/* If the delegate for a message type is not set, messages of this type are ignored (dumped).
+   To delete a delegate, pass NULL.  */
+/* The simplier interface version uses a shared "stock" buffer to receive messages.
+   This buffer can be overwritten at any time after a delegate returns.  */
 int nadam_setDelegate(const char *msgName, nadam_recvDelegate_t delegate);
-int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate, void *buffer);
+int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate,
+        void *buffer, volatile bool *recvStart);
 
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate);
 
