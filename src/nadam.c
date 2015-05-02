@@ -46,7 +46,7 @@ static int allocate(void **dest, size_t size);
 static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
-static int getIndexForName(const char *msgName, size_t *index);
+static int getIndexForName(const char *name, size_t *index);
 
 static nadamMembers_t mbr;
 
@@ -71,14 +71,14 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
     return fillNameMap();
 }
 
-int nadam_setDelegate(const char *msgName, nadam_recvDelegate_t delegate) {
-    return nadam_setDelegateWithRecvBuffer(msgName, delegate, mbr.commonRecvBuffer, NULL);
+int nadam_setDelegate(const char *name, nadam_recvDelegate_t delegate) {
+    return nadam_setDelegateWithRecvBuffer(name, delegate, mbr.commonRecvBuffer, NULL);
 }
 
-int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate,
+int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t delegate,
         void *buffer, volatile bool *recvStart) {
     size_t index;
-    if (getIndexForName(msgName, &index))
+    if (getIndexForName(name, &index))
         return -1;
 
     recvDelegateRelated_t *dp = mbr.delegates + index;
@@ -100,12 +100,29 @@ int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t de
     return 0;
 }
 
-// FIXME dummies
+// FIXME dummy
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate) {
     return 0;
 }
 
 int nadam_send(const char *name, const void *msg, uint32_t size) {
+    size_t index;
+    if (getIndexForName(name, &index))
+        return -1;
+
+    const nadam_messageInfo_t *mi = mbr.messageInfos + index;
+    int errorCollector = mbr.send(mi->hash, (uint32_t) mbr.hashLength);
+    uint32_t n = mi->size.total;
+    if (mi->size.isVariable) {
+        n = size;
+        errorCollector |= mbr.send(&n, 4);
+    }
+    errorCollector |= mbr.send(msg, n);
+
+    if (errorCollector) {
+        errno = NADAM_ERROR_SEND;
+        return -1;
+    }
     return 0;
 }
 
@@ -196,8 +213,8 @@ static int fillNameMap(void) {
     return 0;
 }
 
-static int getIndexForName(const char *msgName, size_t *index) {
-    khiter_t k = kh_get(mStr, mbr.nameKeyMap, msgName);
+static int getIndexForName(const char *name, size_t *index) {
+    khiter_t k = kh_get(mStr, mbr.nameKeyMap, name);
 
     bool nameNotFound = (k == kh_end(mbr.nameKeyMap));
     if (nameNotFound) {

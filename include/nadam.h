@@ -31,6 +31,7 @@ typedef struct {
 #define NADAM_ERROR_ALLOC_FAILED 304
 #define NADAM_ERROR_HANDSHAKE_HASH_LENGTH 305
 #define NADAM_ERROR_DELEGATE_BUFFER 306
+#define NADAM_ERROR_SEND 307
 // errors passed to the error delegate
 #define NADAM_ERROR_CONNECTION_CLOSED 500
 #define NADAM_ERROR_UNKNOWN_HASH 501
@@ -38,8 +39,8 @@ typedef struct {
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);
-/* After recvDelegate returns, memory pointed to by msg should be considered invalid
-   unless own buffer was provided with nadam_setDelegateWithRecvBuffer().
+/* If a delegate was set with nadam_setDelegate()
+   memory pointed to by msg should be considered invalid after it returns.
    Size parmeter will provide the actual size of a variable size message.  */
 typedef void (*nadam_recvDelegate_t)(void *msg, uint32_t size, const nadam_messageInfo_t *messageInfo);
 
@@ -65,16 +66,17 @@ typedef void (*nadam_errorDelegate_t)(int error);
 int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageInfoCount, size_t hashLengthMin);
 
 /* If the delegate for a message type is not set, messages of this type are ignored (dumped).
-   To delete a delegate, pass NULL.  */
-/* The simplier interface version uses a shared "stock" buffer to receive messages.
-   This buffer can be overwritten at any time after a delegate returns.  */
-int nadam_setDelegate(const char *msgName, nadam_recvDelegate_t delegate);
-int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t delegate,
+   Passing NULL as second argument removes the delegate.
+   The simplier interface version uses a shared "stock" buffer to receive messages.
+   This buffer could be overwritten at any time after a delegate returns.  */
+int nadam_setDelegate(const char *name, nadam_recvDelegate_t delegate);
+int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t delegate,
         void *buffer, volatile bool *recvStart);
 
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate);
 
-// size argument is ignored for constant size messages
+/* nadam_send() can only be used after a successful nadam_initiate() call.
+   Size argument is ignored for constant size messages.  */
 int nadam_send(const char *name, const void *msg, uint32_t size);
 /* Calling this send version (Send With Immutable Name) promises
    that the name is a string literal or memory,
