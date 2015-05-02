@@ -20,7 +20,7 @@ typedef struct {
     volatile bool *recvStart;
 } recvDelegateRelated_t;
 
-struct nadamMembers {
+typedef struct {
     khash_t(mStr) *nameKeyMap;
     khash_t(m32) *hashKeyMap;
 
@@ -35,7 +35,7 @@ struct nadamMembers {
     nadam_recv_t recv;
 
     nadam_errorDelegate_t errorDelegate;
-};
+} nadamMembers_t;
 
 // private declarations
 // -----------------------------------------------------------------------------
@@ -47,9 +47,8 @@ static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
 static int getIndexForName(const char *msgName, size_t *index);
-static void cleanDelegate(recvDelegateRelated_t *dp);
 
-static struct nadamMembers mbr;
+static nadamMembers_t mbr;
 
 // interface functions
 // -----------------------------------------------------------------------------
@@ -58,7 +57,7 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
         return -1;
 
     freeMembers();
-    memset(&mbr, 0, sizeof(mbr));
+    memset(&mbr, 0, sizeof(nadamMembers_t));
 
     mbr.messageInfos = messageInfos;
     mbr.messageCount = messageCount;
@@ -85,7 +84,7 @@ int nadam_setDelegateWithRecvBuffer(const char *msgName, nadam_recvDelegate_t de
     recvDelegateRelated_t *dp = mbr.delegates + index;
 
     if (delegate == NULL) {
-        cleanDelegate(dp);
+        memset(dp, 0, sizeof(recvDelegateRelated_t));
         return 0;
     }
 
@@ -210,13 +209,6 @@ static int getIndexForName(const char *msgName, size_t *index) {
     return 0;
 }
 
-static void cleanDelegate(recvDelegateRelated_t *dp) {
-    const recvDelegateRelated_t zeroDelegate = { .delegate = NULL };
-    /* memset() doesn't guarantee that pointers are set in single instruction.
-       The following won't suffice for some systems but is still better than memset().  */
-    *dp = zeroDelegate;
-}
-
 // unittest
 // -----------------------------------------------------------------------------
 #ifdef UNITTEST
@@ -271,7 +263,8 @@ int normalSetDelegateUse(void) {
     recvDelegateRelated_t d = { .delegate = recvDelegateDummy, .buffer = &buffer,
         .recvStart = &recvStart };
     ASSERT(!nadam_setDelegateWithRecvBuffer("ONE", d.delegate, d.buffer, d.recvStart));
-    // TODO getDelegate and verify
+    recvDelegateRelated_t *verify = &mbr.delegates[1];
+    ASSERT(memcmp(&d, verify, sizeof(recvDelegateRelated_t)) == 0);
     return 0;
 }
 
@@ -301,7 +294,6 @@ int removingADelegateClearsItsData(void) {
     recvDelegateRelated_t zeroDelegate = { .delegate = NULL };
     nadam_init(&info, 1, 4);
 
-    // TODO add and use getDelegate instead of using an index
     recvDelegateRelated_t *delegate = &mbr.delegates[0];
     memset(delegate, 0xA5, sizeof(recvDelegateRelated_t));
     ASSERT(!nadam_setDelegateWithRecvBuffer("brown fox", NULL, NULL, NULL));

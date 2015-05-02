@@ -81,4 +81,5 @@ int nadam_send(const char *name, const void *msg, uint32_t size);
    whose content won't change throughout the life of the program - allows name lookup caching.  */
 int nadam_sendWin(const char *name, const void *msg, uint32_t size);
 
+// stops receiving - connection should be closed after this
 void nadam_stop(void);
