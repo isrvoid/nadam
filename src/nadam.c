@@ -295,7 +295,6 @@ int initWithDuplicateName(void) {
 
 // nadam_setDelegateWithRecvBuffer
 // and nadam_setDelegate as long as it simply forwards
-static void recvDelegateDummy(void *msg, uint32_t size, const nadam_messageInfo_t *mi);
 static void recvDelegateDummy(void *msg, uint32_t size, const nadam_messageInfo_t *mi) { }
 
 int normalSetDelegateUse(void) {
@@ -347,6 +346,101 @@ int removingADelegateClearsItsData(void) {
 
 // nadam_send
 // TODO fake initiate, nadam_send_t mockup, add nadam_send tests
+static struct {
+    bool sendWasCalled;
+    size_t n;
+    uint8_t buf[64];
+} sendMockupMbr;
+
+static int sendMockup(const void *src, uint32_t n) {
+    assert(sendMockupMbr.n + n <= sizeof(sendMockupMbr.buf));
+
+    sendMockupMbr.sendWasCalled = true;
+    memcpy(sendMockupMbr.buf + sendMockupMbr.n, src, n);
+    sendMockupMbr.n += n;
+    return 0;
+}
+
+static int failingSendMockup(const void *src, uint32_t n) {
+    return -1;
+}
+
+static void fakeInitiate(nadam_send_t send) {
+    memset(&sendMockupMbr, 0, sizeof(sendMockupMbr));
+    mbr.send = send;
+    mbr.hashLength = 4;
+}
+
+int sendFixedSizeMessageBasic(void) {
+    nadam_messageInfo_t info = { .name = "Aries", .nameLength = 5,
+        .size = { false, { 5 } }, .hash = "Arie" };
+    nadam_init(&info, 1, 4);
+    fakeInitiate(sendMockup);
+
+    const char *msg = "Hello";
+    const char *expected = "ArieHello";
+    ASSERT(!nadam_send("Aries", msg, 0));
+    ASSERT(sendMockupMbr.n == strlen(expected));
+    ASSERT(memcmp(sendMockupMbr.buf, expected, sendMockupMbr.n) == 0);
+    return 0;
+}
+
+int sendVariableSizeMessageBasic(void) {
+    nadam_messageInfo_t info = { .name = "Taurus", .nameLength = 6,
+        .size = { true, { 2 } }, .hash = "Taur" };
+    nadam_init(&info, 1, 4);
+    fakeInitiate(sendMockup);
+
+    const char *msg = "Hi";
+    const uint32_t msgLength = 2;
+    const char expected[] = "Taur\x02\x00\x00\x00Hi";
+    size_t expectedSize = sizeof(expected) - 1;
+
+    ASSERT(!nadam_send("Taurus", msg, msgLength));
+    ASSERT(sendMockupMbr.n == expectedSize);
+    ASSERT(memcmp(sendMockupMbr.buf, expected, sendMockupMbr.n) == 0);
+    return 0;
+}
+
+int sendUnknownMessageError(void) {
+    nadam_messageInfo_t info = { .name = "Gemini", .nameLength = 6,
+        .size = { false, { 5 } }, .hash = "Gemi" };
+    nadam_init(&info, 1, 4);
+    fakeInitiate(sendMockup);
+
+    const char *msg = "don't care";
+    errno = 0;
+    ASSERT(nadam_send("something went wrong", msg, 0));
+    ASSERT(errno == NADAM_ERROR_UNKNOWN_NAME);
+    ASSERT(!sendMockupMbr.sendWasCalled);
+    return 0;
+}
+
+int sendCommunicationError(void) {
+    nadam_messageInfo_t info = { .name = "Virgo", .nameLength = 5 };
+    nadam_init(&info, 1, 4);
+    fakeInitiate(failingSendMockup);
+
+    const char *msg = "don't care";
+    errno = 0;
+    ASSERT(nadam_send("Virgo", msg, 0));
+    ASSERT(errno == NADAM_ERROR_SEND);
+    return 0;
+}
+
+int sendVariableSizeExceedingLengthError(void) {
+    nadam_messageInfo_t info = { .name = "Libra", .nameLength = 5, .size = { true, { 7 } } };
+    nadam_init(&info, 1, 4);
+    fakeInitiate(sendMockup);
+
+    const char msg[] = "size of this message has somehow swollen";
+    const uint32_t msgSize = (uint32_t) sizeof(msg) - 1;
+    errno = 0;
+    ASSERT(nadam_send("Libra", msg, msgSize));
+    ASSERT(errno == NADAM_ERROR_SIZE_ARG);
+    ASSERT(!sendMockupMbr.sendWasCalled);
+    return 0;
+}
 
 // allocate
 int tryToAllocateSmallAmountOfMemory(void) {
