@@ -31,11 +31,13 @@ typedef struct {
 #define NADAM_ERROR_ALLOC_FAILED 304
 #define NADAM_ERROR_HANDSHAKE_HASH_LENGTH 305
 #define NADAM_ERROR_DELEGATE_BUFFER 306
-#define NADAM_ERROR_SEND 307
+#define NADAM_ERROR_NULL_POINTER 307
+#define NADAM_ERROR_SEND 308
+#define NADAM_ERROR_SIZE_ARG 309
 // errors passed to the error delegate
 #define NADAM_ERROR_CONNECTION_CLOSED 500
 #define NADAM_ERROR_UNKNOWN_HASH 501
-#define NADAM_ERROR_VARIABLE_SIZE 502 // also returned by nadam_send()
+#define NADAM_ERROR_VARIABLE_SIZE 502
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);

@@ -98,12 +98,19 @@ int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t deleg
     dp->recvStart = recvStart;
     dp->buffer = buffer;
     dp->delegate = delegate;
-
     return 0;
 }
 
 // FIXME dummy
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate) {
+    if (send == NULL || recv == NULL || errorDelegate == NULL) {
+        errno = NADAM_ERROR_NULL_POINTER;
+        return -1;
+    }
+
+    mbr.send = send;
+    mbr.recv = recv;
+    mbr.errorDelegate = errorDelegate;
     return 0;
 }
 
@@ -142,7 +149,6 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
         errno = NADAM_ERROR_MIN_HASH_LENGTH;
         return -1;
     }
-
     return 0;
 }
 
@@ -233,7 +239,7 @@ static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg) {
 
 static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint32_t size) {
     if (size > mi->size.max) {
-        errno = NADAM_ERROR_VARIABLE_SIZE;
+        errno = NADAM_ERROR_SIZE_ARG;
         return -1;
     }
     int errorCollector = mbr.send(mi->hash, (uint32_t) mbr.hashLength);
@@ -338,6 +344,9 @@ int removingADelegateClearsItsData(void) {
     ASSERT(memcmp(delegate, &zeroDelegate, sizeof(recvDelegateRelated_t)) == 0);
     return 0;
 }
+
+// nadam_send
+// TODO fake initiate, nadam_send_t mockup, add nadam_send tests
 
 // allocate
 int tryToAllocateSmallAmountOfMemory(void) {
