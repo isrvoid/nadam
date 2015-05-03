@@ -47,6 +47,8 @@ static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
 static int getIndexForName(const char *name, size_t *index);
+static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg);
+static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint32_t size);
 
 static nadamMembers_t mbr;
 
@@ -111,19 +113,11 @@ int nadam_send(const char *name, const void *msg, uint32_t size) {
         return -1;
 
     const nadam_messageInfo_t *mi = mbr.messageInfos + index;
-    int errorCollector = mbr.send(mi->hash, (uint32_t) mbr.hashLength);
-    uint32_t n = mi->size.total;
-    if (mi->size.isVariable) {
-        n = size;
-        errorCollector |= mbr.send(&n, 4);
-    }
-    errorCollector |= mbr.send(msg, n);
-
-    if (errorCollector) {
-        errno = NADAM_ERROR_SEND;
-        return -1;
-    }
-    return 0;
+    bool isFixedSize = !mi->size.isVariable;
+    if(isFixedSize)
+        return sendFixedSize(mi, msg);
+    else
+        return sendVariableSize(mi, msg, size);
 }
 
 int nadam_sendWin(const char *name, const void *msg, uint32_t size) {
@@ -223,6 +217,33 @@ static int getIndexForName(const char *name, size_t *index) {
     }
 
     *index = kh_val(mbr.nameKeyMap, k);
+    return 0;
+}
+
+static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg) {
+    int errorCollector = mbr.send(mi->hash, (uint32_t) mbr.hashLength);
+    errorCollector |= mbr.send(msg, mi->size.total);
+
+    if (errorCollector) {
+        errno = NADAM_ERROR_SEND;
+        return -1;
+    }
+    return 0;
+}
+
+static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint32_t size) {
+    if (size > mi->size.max) {
+        errno = NADAM_ERROR_VARIABLE_SIZE;
+        return -1;
+    }
+    int errorCollector = mbr.send(mi->hash, (uint32_t) mbr.hashLength);
+    errorCollector |= mbr.send(&size, 4);
+    errorCollector |= mbr.send(msg, size);
+
+    if (errorCollector) {
+        errno = NADAM_ERROR_SEND;
+        return -1;
+    }
     return 0;
 }
 

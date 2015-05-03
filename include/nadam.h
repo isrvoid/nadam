@@ -35,7 +35,7 @@ typedef struct {
 // errors passed to the error delegate
 #define NADAM_ERROR_CONNECTION_CLOSED 500
 #define NADAM_ERROR_UNKNOWN_HASH 501
-#define NADAM_ERROR_VARIABLE_SIZE 502
+#define NADAM_ERROR_VARIABLE_SIZE 502 // also returned by nadam_send()
 
 typedef int (*nadam_send_t)(const void *src, uint32_t n);
 typedef int (*nadam_recv_t)(void *dest, uint32_t n);
