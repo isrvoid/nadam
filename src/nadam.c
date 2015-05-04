@@ -4,6 +4,7 @@ License:    opensource.org/licenses/MIT
 */
 #include "nadam.h"
 
+#include <pthread.h>
 #include <errno.h>
 #include <assert.h>
 
@@ -52,6 +53,8 @@ static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
 static int getIndexForName(const char *name, size_t *index);
+static int getIndexForHash(const uint8_t *hash, size_t *index);
+static int recvWorker(void *arg);
 static int sendHashLength(void);
 static int handleHashLengthRecv(void);
 static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg);
@@ -124,7 +127,7 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
     if (handleHashLengthRecv())
         return -1;
 
-    // TODO spawn thread, start receiving
+    // TODO make hash key map, spawn thread
 
     return 0;
 }
@@ -235,6 +238,23 @@ static int getIndexForName(const char *name, size_t *index) {
 
     *index = kh_val(mbr.nameKeyMap, k);
     return 0;
+}
+
+static int getIndexForHash(const uint8_t *hash, size_t *index) {
+    // FIXME make hash
+    khiter_t k = kh_get(m32, mbr.hashKeyMap,
+    return 0;
+}
+
+static int recvWorker(void *arg) {
+    uint8_t hash[20];
+    // FIXME
+    while (true) {
+        if (mbr.recv(&hash, (uint32_t) mbr.hashLength)) {
+            mbr.errorDelegate(NADAM_ERROR_RECV);
+            return -1;
+        }
+    }
 }
 
 static int sendHashLength(void) {
