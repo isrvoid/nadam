@@ -14,6 +14,11 @@ License:    opensource.org/licenses/MIT
 KHASH_MAP_INIT_INT(m32, size_t)
 KHASH_MAP_INIT_STR(mStr, size_t)
 
+/* For initial implementation let's assume that
+   all hashes can be uniquely distinguished by the first 4 bytes
+   TODO extension for lengths (4,8] with uint64_t keys  */
+#define HASH_LENGTH_MAX 4
+
 typedef struct {
     nadam_recvDelegate_t delegate;
     void *buffer;
@@ -47,6 +52,8 @@ static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
 static int getIndexForName(const char *name, size_t *index);
+static int sendHashLength(void);
+static int handleHashLengthRecv(void);
 static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg);
 static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint32_t size);
 
@@ -101,7 +108,6 @@ int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t deleg
     return 0;
 }
 
-// FIXME dummy
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate) {
     if (send == NULL || recv == NULL || errorDelegate == NULL) {
         errno = NADAM_ERROR_NULL_POINTER;
@@ -111,6 +117,15 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
     mbr.send = send;
     mbr.recv = recv;
     mbr.errorDelegate = errorDelegate;
+
+    if (sendHashLength())
+        return -1;
+
+    if (handleHashLengthRecv())
+        return -1;
+
+    // TODO spawn thread, start receiving
+
     return 0;
 }
 
@@ -142,10 +157,7 @@ static int testInitIn(size_t infoCount, size_t hashLengthMin) {
         return -1;
     }
 
-    /* For initial implementation let's assume that
-       all hashes can be uniquely distinguished by the first 4 bytes
-       TODO extension for lengths (4,8] with uint64_t keys  */
-    if (hashLengthMin == 0 || hashLengthMin > 4) {
+    if (hashLengthMin == 0 || hashLengthMin > HASH_LENGTH_MAX) {
         errno = NADAM_ERROR_MIN_HASH_LENGTH;
         return -1;
     }
@@ -209,7 +221,6 @@ static int fillNameMap(void) {
 
         kh_val(mbr.nameKeyMap, k) = i;
     }
-
     return 0;
 }
 
@@ -223,6 +234,33 @@ static int getIndexForName(const char *name, size_t *index) {
     }
 
     *index = kh_val(mbr.nameKeyMap, k);
+    return 0;
+}
+
+static int sendHashLength(void) {
+    const uint8_t hashLength = (uint8_t) mbr.hashLength;
+    if (mbr.send(&hashLength, 1)) {
+        errno = NADAM_ERROR_HANDSHAKE_SEND;
+        return -1;
+    }
+    return 0;
+}
+
+static int handleHashLengthRecv(void) {
+    uint8_t hashLength;
+    if (mbr.recv(&hashLength, 1)) {
+        errno = NADAM_ERROR_HANDSHAKE_RECV;
+        return -1;
+    }
+
+    if (hashLength > HASH_LENGTH_MAX) {
+        errno = NADAM_ERROR_HANDSHAKE_HASH_LENGTH;
+        return -1;
+    }
+
+    if (hashLength > mbr.hashLength)
+        mbr.hashLength = hashLength;
+
     return 0;
 }
 
