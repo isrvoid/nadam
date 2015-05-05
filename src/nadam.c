@@ -52,8 +52,10 @@ static int allocate(void **dest, size_t size);
 static uint32_t getMaxMessageSize(void);
 static void initMaps(void);
 static int fillNameMap(void);
+static void fillHashMap(void);
 static int getIndexForName(const char *name, size_t *index);
 static int getIndexForHash(const uint8_t *hash, size_t *index);
+static uint32_t truncateHash(const uint8_t *hash);
 static int recvWorker(void *arg);
 static int sendHashLength(void);
 static int handleHashLengthRecv(void);
@@ -127,7 +129,8 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
     if (handleHashLengthRecv())
         return -1;
 
-    // TODO make hash key map, spawn thread
+    fillHashMap();
+    // TODO spawn thread
 
     return 0;
 }
@@ -211,7 +214,7 @@ static void initMaps(void) {
 }
 
 static int fillNameMap(void) {
-    for (size_t i = 0; i < mbr.messageCount; i++) {
+    for (size_t i = 0; i < mbr.messageCount; ++i) {
         int ret;
         khiter_t k = kh_put(mStr, mbr.nameKeyMap, mbr.messageInfos[i].name, &ret);
         assert(ret != -1);
@@ -225,6 +228,17 @@ static int fillNameMap(void) {
         kh_val(mbr.nameKeyMap, k) = i;
     }
     return 0;
+}
+
+static void fillHashMap(void) {
+    for (size_t i = 0; i < mbr.messageCount; ++i) {
+        int ret;
+        uint32_t hash = truncateHash(mbr.messageInfos[i].hash);
+        khiter_t k = kh_put(m32, mbr.hashKeyMap, hash, &ret);
+        assert(ret != -1);
+
+        kh_val(mbr.hashKeyMap, k) = i;
+    }
 }
 
 static int getIndexForName(const char *name, size_t *index) {
@@ -241,9 +255,22 @@ static int getIndexForName(const char *name, size_t *index) {
 }
 
 static int getIndexForHash(const uint8_t *hash, size_t *index) {
-    // FIXME make hash
-    khiter_t k = kh_get(m32, mbr.hashKeyMap,
+    khiter_t k = kh_get(m32, mbr.hashKeyMap, truncateHash(hash));
+
+    bool nameNotFound = (k == kh_end(mbr.hashKeyMap));
+    if (nameNotFound) {
+        errno = NADAM_ERROR_UNKNOWN_HASH;
+        return -1;
+    }
+
+    *index = kh_val(mbr.hashKeyMap, k);
     return 0;
+}
+
+static uint32_t truncateHash(const uint8_t *hash) {
+    uint32_t res = 0;
+    memcpy(&res, hash, mbr.hashLength);
+    return res;
 }
 
 static int recvWorker(void *arg) {
