@@ -54,13 +54,15 @@ static void initMaps(void);
 static int fillNameMap(void);
 static void fillHashMap(void);
 static int getIndexForName(const char *name, size_t *index);
-static int getIndexForHash(const uint8_t *hash, size_t *index);
-static uint32_t truncateHash(const uint8_t *hash);
-static int recvWorker(void *arg);
-static int sendHashLength(void);
-static int handleHashLengthRecv(void);
+static int handshakeSendHashLength(void);
+static int handshakeHandleHashLengthRecv(void);
 static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg);
 static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint32_t size);
+// recv (delegate error reporting)
+static int recvWorker(void *arg);
+static int getIndexForHash(const uint8_t *hash, size_t *index);
+static uint32_t truncateHash(const uint8_t *hash);
+static int recvCommon(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate);
 
 static nadamMembers_t mbr;
 
@@ -123,10 +125,10 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
     mbr.recv = recv;
     mbr.errorDelegate = errorDelegate;
 
-    if (sendHashLength())
+    if (handshakeSendHashLength())
         return -1;
 
-    if (handleHashLengthRecv())
+    if (handshakeHandleHashLengthRecv())
         return -1;
 
     fillHashMap();
@@ -254,37 +256,7 @@ static int getIndexForName(const char *name, size_t *index) {
     return 0;
 }
 
-static int getIndexForHash(const uint8_t *hash, size_t *index) {
-    khiter_t k = kh_get(m32, mbr.hashKeyMap, truncateHash(hash));
-
-    bool nameNotFound = (k == kh_end(mbr.hashKeyMap));
-    if (nameNotFound) {
-        errno = NADAM_ERROR_UNKNOWN_HASH;
-        return -1;
-    }
-
-    *index = kh_val(mbr.hashKeyMap, k);
-    return 0;
-}
-
-static uint32_t truncateHash(const uint8_t *hash) {
-    uint32_t res = 0;
-    memcpy(&res, hash, mbr.hashLength);
-    return res;
-}
-
-static int recvWorker(void *arg) {
-    uint8_t hash[20];
-    // FIXME
-    while (true) {
-        if (mbr.recv(&hash, (uint32_t) mbr.hashLength)) {
-            mbr.errorDelegate(NADAM_ERROR_RECV);
-            return -1;
-        }
-    }
-}
-
-static int sendHashLength(void) {
+static int handshakeSendHashLength(void) {
     const uint8_t hashLength = (uint8_t) mbr.hashLength;
     if (mbr.send(&hashLength, 1)) {
         errno = NADAM_ERROR_HANDSHAKE_SEND;
@@ -293,7 +265,7 @@ static int sendHashLength(void) {
     return 0;
 }
 
-static int handleHashLengthRecv(void) {
+static int handshakeHandleHashLengthRecv(void) {
     uint8_t hashLength;
     if (mbr.recv(&hashLength, 1)) {
         errno = NADAM_ERROR_HANDSHAKE_RECV;
@@ -335,6 +307,52 @@ static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint
         errno = NADAM_ERROR_SEND;
         return -1;
     }
+    return 0;
+}
+
+// recv
+static int recvWorker(void *arg) {
+    uint8_t hash[HASH_LENGTH_MAX];
+    while (true) {
+        if (mbr.recv(hash, (uint32_t) mbr.hashLength)) {
+            mbr.errorDelegate(NADAM_ERROR_RECV);
+            return -1;
+        }
+        size_t index;
+        int error = getIndexForHash(hash, &index);
+        if (error) {
+            mbr.errorDelegate(error);
+            return -1;
+        }
+
+        error = recvCommon(mbr.messageInfos + index, mbr.delegates + index);
+        if (error) {
+            mbr.errorDelegate(error);
+            return -1;
+        }
+    }
+}
+
+static int getIndexForHash(const uint8_t *hash, size_t *index) {
+    khiter_t k = kh_get(m32, mbr.hashKeyMap, truncateHash(hash));
+
+    bool hashNotFound = (k == kh_end(mbr.hashKeyMap));
+    if (hashNotFound)
+        return NADAM_ERROR_UNKNOWN_HASH;
+
+    *index = kh_val(mbr.hashKeyMap, k);
+    return 0;
+}
+
+static uint32_t truncateHash(const uint8_t *hash) {
+    uint32_t res = 0;
+    memcpy(&res, hash, mbr.hashLength);
+    return res;
+}
+
+static int recvCommon(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate) {
+    // FIXME
+    // don't forget delegate's recvStart
     return 0;
 }
 
@@ -430,7 +448,6 @@ int removingADelegateClearsItsData(void) {
 }
 
 // nadam_send
-// TODO fake initiate, nadam_send_t mockup, add nadam_send tests
 static struct {
     bool sendWasCalled;
     size_t n;
@@ -450,7 +467,7 @@ static int failingSendMockup(const void *src, uint32_t n) {
     return -1;
 }
 
-static void fakeInitiate(nadam_send_t send) {
+static void fakeSendInitiate(nadam_send_t send) {
     memset(&sendMockupMbr, 0, sizeof(sendMockupMbr));
     mbr.send = send;
     mbr.hashLength = 4;
@@ -460,7 +477,7 @@ int sendFixedSizeMessageBasic(void) {
     nadam_messageInfo_t info = { .name = "Aries", .nameLength = 5,
         .size = { false, { 5 } }, .hash = "Arie" };
     nadam_init(&info, 1, 4);
-    fakeInitiate(sendMockup);
+    fakeSendInitiate(sendMockup);
 
     const char *msg = "Hello";
     const char *expected = "ArieHello";
@@ -474,7 +491,7 @@ int sendVariableSizeMessageBasic(void) {
     nadam_messageInfo_t info = { .name = "Taurus", .nameLength = 6,
         .size = { true, { 2 } }, .hash = "Taur" };
     nadam_init(&info, 1, 4);
-    fakeInitiate(sendMockup);
+    fakeSendInitiate(sendMockup);
 
     const char *msg = "Hi";
     const uint32_t msgLength = 2;
@@ -491,7 +508,7 @@ int sendUnknownMessageError(void) {
     nadam_messageInfo_t info = { .name = "Gemini", .nameLength = 6,
         .size = { false, { 5 } }, .hash = "Gemi" };
     nadam_init(&info, 1, 4);
-    fakeInitiate(sendMockup);
+    fakeSendInitiate(sendMockup);
 
     const char *msg = "don't care";
     errno = 0;
@@ -504,7 +521,7 @@ int sendUnknownMessageError(void) {
 int sendCommunicationError(void) {
     nadam_messageInfo_t info = { .name = "Virgo", .nameLength = 5 };
     nadam_init(&info, 1, 4);
-    fakeInitiate(failingSendMockup);
+    fakeSendInitiate(failingSendMockup);
 
     const char *msg = "don't care";
     errno = 0;
@@ -516,7 +533,7 @@ int sendCommunicationError(void) {
 int sendVariableSizeExceedingLengthError(void) {
     nadam_messageInfo_t info = { .name = "Libra", .nameLength = 5, .size = { true, { 7 } } };
     nadam_init(&info, 1, 4);
-    fakeInitiate(sendMockup);
+    fakeSendInitiate(sendMockup);
 
     const char msg[] = "size of this message has somehow swollen";
     const uint32_t msgSize = (uint32_t) sizeof(msg) - 1;
@@ -526,6 +543,9 @@ int sendVariableSizeExceedingLengthError(void) {
     ASSERT(!sendMockupMbr.sendWasCalled);
     return 0;
 }
+
+// receiving (no explicit recv function)
+// TODO
 
 // allocate
 int tryToAllocateSmallAmountOfMemory(void) {
