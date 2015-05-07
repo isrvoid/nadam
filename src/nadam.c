@@ -66,7 +66,8 @@ static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint
 static int recvWorker(void *arg);
 static int getIndexForHash(const uint8_t *hash, size_t *index);
 static uint32_t truncateHash(const uint8_t *hash);
-static int recvCommon(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate);
+static int recvMessage(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate);
+static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size);
 
 static nadamMembers_t mbr;
 
@@ -344,7 +345,7 @@ static int recvWorker(void *arg) {
             return -1;
         }
 
-        error = recvCommon(mbr.messageInfos + index, mbr.delegates + index);
+        error = recvMessage(mbr.messageInfos + index, mbr.delegates + index);
         if (error) {
             mbr.errorDelegate(error);
             return -1;
@@ -369,9 +370,33 @@ static uint32_t truncateHash(const uint8_t *hash) {
     return res;
 }
 
-static int recvCommon(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate) {
-    // FIXME
-    // don't forget delegate's recvStart
+static int recvMessage(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate) {
+    uint32_t size;
+    int error = getMessageSize(mi, &size);
+    if (error)
+        return error;
+
+    *delegate->recvStart = true;
+    if (mbr.recv(delegate->buffer, size))
+        return NADAM_ERROR_RECV;
+
+    return 0;
+}
+
+static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size) {
+    nadam_messageSize_t ms = mi->size;
+    uint32_t s;
+    if (ms.isVariable) {
+        if (mbr.recv(&s, 4))
+            return NADAM_ERROR_RECV;
+
+        if (s > ms.max)
+            return NADAM_ERROR_VARIABLE_SIZE;
+    } else {
+        s = ms.total;
+    }
+
+    *size = s;
     return 0;
 }
 
