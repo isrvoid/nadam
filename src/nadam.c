@@ -466,6 +466,16 @@ int removingADelegateClearsItsData(void) {
     return 0;
 }
 
+int passingNullForDelegatesRecvStartUsesInitValue(void) {
+    nadam_messageInfo_t info = { .name = "Scorpio", .nameLength = 7 };
+    nadam_init(&info, 1, 4);
+
+    int nonNull;
+    ASSERT(!nadam_setDelegateWithRecvBuffer("Scorpio", recvDelegateDummy, &nonNull, NULL));
+    ASSERT(mbr.delegates[0].recvStart != NULL);
+    return 0;
+}
+
 // nadam_send
 static struct {
     bool sendWasCalled;
