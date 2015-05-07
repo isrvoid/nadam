@@ -32,6 +32,7 @@ typedef struct {
 
     void *commonRecvBuffer;
     recvDelegateRelated_t *delegates;
+    bool nullRecvStart;
 
     const nadam_messageInfo_t *messageInfos;
     size_t messageCount;
@@ -50,10 +51,13 @@ static void freeMembers(void);
 static int allocateMembers(void);
 static int allocate(void **dest, size_t size);
 static uint32_t getMaxMessageSize(void);
+static void initDelegates(void);
+static recvDelegateRelated_t getDelegateInit(void);
 static void initMaps(void);
 static int fillNameMap(void);
 static void fillHashMap(void);
 static int getIndexForName(const char *name, size_t *index);
+static void nullDelegate(void *msg, uint32_t size, const nadam_messageInfo_t *messageInfo);
 static int handshakeSendHashLength(void);
 static int handshakeHandleHashLengthRecv(void);
 static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg);
@@ -82,8 +86,8 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
     if (allocateMembers())
         return -1;
 
+    initDelegates();
     initMaps();
-
     return fillNameMap();
 }
 
@@ -100,7 +104,7 @@ int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t deleg
     recvDelegateRelated_t *dp = mbr.delegates + index;
 
     if (delegate == NULL) {
-        memset(dp, 0, sizeof(recvDelegateRelated_t));
+        *dp = getDelegateInit();
         return 0;
     }
 
@@ -109,7 +113,7 @@ int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t deleg
         return -1;
     }
 
-    dp->recvStart = recvStart;
+    dp->recvStart = recvStart ? recvStart : &mbr.nullRecvStart;
     dp->buffer = buffer;
     dp->delegate = delegate;
     return 0;
@@ -210,6 +214,18 @@ static uint32_t getMaxMessageSize(void) {
     return maxSize;
 }
 
+static void initDelegates(void) {
+    for (size_t i = 0; i < mbr.messageCount; ++i)
+        mbr.delegates[i] = getDelegateInit();
+}
+
+static recvDelegateRelated_t getDelegateInit(void) {
+    recvDelegateRelated_t init = { .delegate = nullDelegate,
+        .buffer = mbr.commonRecvBuffer,
+        .recvStart = &mbr.nullRecvStart };
+    return init;
+}
+
 static void initMaps(void) {
     mbr.nameKeyMap = kh_init(mStr);
     mbr.hashKeyMap = kh_init(m32);
@@ -255,6 +271,8 @@ static int getIndexForName(const char *name, size_t *index) {
     *index = kh_val(mbr.nameKeyMap, k);
     return 0;
 }
+
+static void nullDelegate(void *msg, uint32_t size, const nadam_messageInfo_t *messageInfo) { }
 
 static int handshakeSendHashLength(void) {
     const uint8_t hashLength = (uint8_t) mbr.hashLength;
@@ -318,6 +336,7 @@ static int recvWorker(void *arg) {
             mbr.errorDelegate(NADAM_ERROR_RECV);
             return -1;
         }
+
         size_t index;
         int error = getIndexForHash(hash, &index);
         if (error) {
@@ -437,13 +456,13 @@ int nullBufferForNonNullDelegateError(void) {
 
 int removingADelegateClearsItsData(void) {
     nadam_messageInfo_t info = { .name = "brown fox", .nameLength = 9 };
-    recvDelegateRelated_t zeroDelegate = { .delegate = NULL };
     nadam_init(&info, 1, 4);
+    recvDelegateRelated_t delegateInit = getDelegateInit();
 
     recvDelegateRelated_t *delegate = &mbr.delegates[0];
     memset(delegate, 0xA5, sizeof(recvDelegateRelated_t));
     ASSERT(!nadam_setDelegateWithRecvBuffer("brown fox", NULL, NULL, NULL));
-    ASSERT(memcmp(delegate, &zeroDelegate, sizeof(recvDelegateRelated_t)) == 0);
+    ASSERT(memcmp(delegate, &delegateInit, sizeof(recvDelegateRelated_t)) == 0);
     return 0;
 }
 
@@ -472,6 +491,7 @@ static void fakeSendInitiate(nadam_send_t send) {
     mbr.send = send;
     mbr.hashLength = 4;
 }
+// nadam_send helper - end
 
 int sendFixedSizeMessageBasic(void) {
     nadam_messageInfo_t info = { .name = "Aries", .nameLength = 5,
@@ -544,8 +564,42 @@ int sendVariableSizeExceedingLengthError(void) {
     return 0;
 }
 
-// receiving (no explicit recv function)
-// TODO
+// recvWorker
+static struct {
+    int error;
+    size_t n;
+    uint8_t buf[64];
+} recvMockupMbr;
+
+static int recvMockup(void *dest, uint32_t n) {
+    if (n > recvMockupMbr.n)
+        return -1;
+
+    memcpy(dest, recvMockupMbr.buf, n);
+    recvMockupMbr.n -= n;
+    return 0;
+}
+
+static void errorDelegateMockup(int error) {
+    recvMockupMbr.error = error;
+}
+
+static void fakeRecvInitiate(void *recvContent, size_t n) {
+    assert(n <= sizeof(recvMockupMbr.buf));
+
+    memcpy(recvMockupMbr.buf, recvContent, n);
+    recvMockupMbr.n = n;
+    recvMockupMbr.error = 0;
+
+    mbr.recv = recvMockup;
+    mbr.errorDelegate = errorDelegateMockup;
+    mbr.hashLength = 4;
+
+    fillHashMap();
+}
+// recvWorker helper - end
+// TODO tests - including variable length error
+
 
 // allocate
 int tryToAllocateSmallAmountOfMemory(void) {
