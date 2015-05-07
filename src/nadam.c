@@ -66,7 +66,6 @@ static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint
 static int recvWorker(void *arg);
 static int getIndexForHash(const uint8_t *hash, size_t *index);
 static uint32_t truncateHash(const uint8_t *hash);
-static int recvMessage(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate);
 static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size);
 
 static nadamMembers_t mbr;
@@ -345,11 +344,23 @@ static int recvWorker(void *arg) {
             return -1;
         }
 
-        error = recvMessage(mbr.messageInfos + index, mbr.delegates + index);
+        const nadam_messageInfo_t *messageInfo = mbr.messageInfos + index;
+        uint32_t size;
+        error = getMessageSize(messageInfo, &size);
         if (error) {
             mbr.errorDelegate(error);
             return -1;
         }
+
+        const recvDelegateRelated_t *delegate = mbr.delegates + index;
+        void *buffer = delegate->buffer;
+        *delegate->recvStart = true;
+        if (mbr.recv(buffer, size)) {
+            mbr.errorDelegate(NADAM_ERROR_RECV);
+            return -1;
+        }
+
+        delegate->delegate(buffer, size, messageInfo);
     }
 }
 
@@ -368,19 +379,6 @@ static uint32_t truncateHash(const uint8_t *hash) {
     uint32_t res = 0;
     memcpy(&res, hash, mbr.hashLength);
     return res;
-}
-
-static int recvMessage(const nadam_messageInfo_t *mi, const recvDelegateRelated_t *delegate) {
-    uint32_t size;
-    int error = getMessageSize(mi, &size);
-    if (error)
-        return error;
-
-    *delegate->recvStart = true;
-    if (mbr.recv(delegate->buffer, size))
-        return NADAM_ERROR_RECV;
-
-    return 0;
 }
 
 static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size) {
@@ -555,7 +553,7 @@ int sendVariableSizeMessageBasic(void) {
 
     ASSERT(!nadam_send("Taurus", msg, msgLength));
     ASSERT(sendMockupMbr.n == expectedSize);
-    ASSERT(memcmp(sendMockupMbr.buf, expected, sendMockupMbr.n) == 0);
+    ASSERT(memcmp(sendMockupMbr.buf, expected, expectedSize) == 0);
     return 0;
 }
 
@@ -604,6 +602,8 @@ static struct {
     int error;
     size_t n;
     uint8_t buf[64];
+    uint32_t nRecv;
+    uint8_t bufRecv[64];
 } recvMockupMbr;
 
 static int recvMockup(void *dest, uint32_t n) {
@@ -619,7 +619,7 @@ static void errorDelegateMockup(int error) {
     recvMockupMbr.error = error;
 }
 
-static void fakeRecvInitiate(void *recvContent, size_t n) {
+static void fakeRecvInitiate(const void *recvContent, size_t n) {
     assert(n <= sizeof(recvMockupMbr.buf));
 
     memcpy(recvMockupMbr.buf, recvContent, n);
@@ -631,10 +631,34 @@ static void fakeRecvInitiate(void *recvContent, size_t n) {
     mbr.hashLength = 4;
 
     fillHashMap();
+    int error = recvWorker(NULL);
+    assert(error == -1);
+}
+
+static void recvDelegateMockup(void *msg, uint32_t size, const nadam_messageInfo_t *mi) {
+    memcpy(recvMockupMbr.bufRecv, msg, size);
+    recvMockupMbr.nRecv = size;
 }
 // recvWorker helper - end
 // TODO tests - including variable length error
+int recvFixedSizeMessageBasic(void) {
+    nadam_messageInfo_t info = { .name = "Sagittarius", .nameLength = 11, .size = { false, { 5 } },
+        .hash = "Sagi" };
+    nadam_init(&info, 1, 4);
+    nadam_setDelegate("Sagittarius", recvDelegateMockup);
 
+    const char *recvContent = "Sagi54321";
+    const char *expected = "54321";
+    size_t expectedSize = strlen(expected);
+    fakeRecvInitiate(recvContent, strlen(recvContent));
+
+    ASSERT(recvMockupMbr.error == NADAM_ERROR_RECV);
+    ASSERT(recvMockupMbr.nRecv == expectedSize);
+    // FIXME
+    //printf(recvMockupMbr.bufRecv);
+    ASSERT(memcmp(recvMockupMbr.bufRecv, expected, expectedSize) == 0);
+    return 0;
+}
 
 // allocate
 int tryToAllocateSmallAmountOfMemory(void) {
