@@ -403,8 +403,8 @@ static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size) {
 #ifdef UNITTEST
 // nadam_init
 int initWithPlausibleArgs(void) {
-    nadam_messageInfo_t infos[] = { { .name = "foo", .nameLength = 3 }, 
-        { .name = "funhun", .nameLength = 6 } };
+    nadam_messageInfo_t infos[] = { { .name = "foo" }, 
+        { .name = "funhun" } };
     errno = 0;
     ASSERT(!nadam_init(infos, 2, 4));
     ASSERT(!errno);
@@ -419,7 +419,7 @@ int initWithEmptyMessageInfos(void) {
 }
 
 int initWithWrongHashLength(void) {
-    nadam_messageInfo_t info = { .name = "foo", .nameLength = 3 };
+    nadam_messageInfo_t info = { .name = "foo" };
     errno = 0;
     ASSERT(nadam_init(&info, 1, 0));
     ASSERT(errno == NADAM_ERROR_MIN_HASH_LENGTH);
@@ -430,8 +430,8 @@ int initWithWrongHashLength(void) {
 }
 
 int initWithDuplicateName(void) {
-    nadam_messageInfo_t infos[] = { { .name = "foo", .nameLength = 3 }, 
-        { .name = "foo", .nameLength = 3 } };
+    nadam_messageInfo_t infos[] = { { .name = "foo" }, 
+        { .name = "foo" } };
     errno = 0;
     ASSERT(nadam_init(infos, 2, 4));
     ASSERT(errno == NADAM_ERROR_NAME_COLLISION);
@@ -443,7 +443,7 @@ int initWithDuplicateName(void) {
 static void recvDelegateDummy(void *msg, uint32_t size, const nadam_messageInfo_t *mi) { }
 
 int normalSetDelegateUse(void) {
-    nadam_messageInfo_t infos[] = { { .name = "ZERO", .nameLength = 4 }, { .name = "ONE", .nameLength = 3 } };
+    nadam_messageInfo_t infos[] = { { .name = "ZERO" }, { .name = "ONE" } };
     nadam_init(infos, 2, 4);
 
     int buffer;
@@ -457,7 +457,7 @@ int normalSetDelegateUse(void) {
 }
 
 int setDelegateOfUnknownMessageError(void) {
-    nadam_messageInfo_t info = { .name = "[+]", .nameLength = 3 };
+    nadam_messageInfo_t info = { .name = "[+]" };
     nadam_init(&info, 1, 4);
 
     errno = 0;
@@ -468,7 +468,7 @@ int setDelegateOfUnknownMessageError(void) {
 }
 
 int nullBufferForNonNullDelegateError(void) {
-    nadam_messageInfo_t info = { .name = "hi there", .nameLength = 8 };
+    nadam_messageInfo_t info = { .name = "hi there" };
     nadam_init(&info, 1, 4);
 
     errno = 0;
@@ -478,7 +478,7 @@ int nullBufferForNonNullDelegateError(void) {
 }
 
 int removingADelegateClearsItsData(void) {
-    nadam_messageInfo_t info = { .name = "brown fox", .nameLength = 9 };
+    nadam_messageInfo_t info = { .name = "brown fox" };
     nadam_init(&info, 1, 4);
     recvDelegateRelated_t delegateInit = getDelegateInit();
 
@@ -490,7 +490,7 @@ int removingADelegateClearsItsData(void) {
 }
 
 int passingNullForDelegatesRecvStartUsesInitValue(void) {
-    nadam_messageInfo_t info = { .name = "Scorpio", .nameLength = 7 };
+    nadam_messageInfo_t info = { .name = "Scorpio" };
     nadam_init(&info, 1, 4);
 
     int nonNull;
@@ -527,8 +527,7 @@ static void fakeSendInitiate(nadam_send_t send) {
 // nadam_send helper - end
 
 int sendFixedSizeMessageBasic(void) {
-    nadam_messageInfo_t info = { .name = "Aries", .nameLength = 5,
-        .size = { false, { 5 } }, .hash = "Arie" };
+    nadam_messageInfo_t info = { .name = "Aries", .size = { false, { 5 } }, .hash = "Arie" };
     nadam_init(&info, 1, 4);
     fakeSendInitiate(sendMockup);
 
@@ -541,8 +540,7 @@ int sendFixedSizeMessageBasic(void) {
 }
 
 int sendVariableSizeMessageBasic(void) {
-    nadam_messageInfo_t info = { .name = "Taurus", .nameLength = 6,
-        .size = { true, { 2 } }, .hash = "Taur" };
+    nadam_messageInfo_t info = { .name = "Taurus", .size = { true, { 2 } }, .hash = "Taur" };
     nadam_init(&info, 1, 4);
     fakeSendInitiate(sendMockup);
 
@@ -558,8 +556,7 @@ int sendVariableSizeMessageBasic(void) {
 }
 
 int sendUnknownMessageError(void) {
-    nadam_messageInfo_t info = { .name = "Gemini", .nameLength = 6,
-        .size = { false, { 5 } }, .hash = "Gemi" };
+    nadam_messageInfo_t info = { .name = "Gemini", .size = { false, { 5 } }, .hash = "Gemi" };
     nadam_init(&info, 1, 4);
     fakeSendInitiate(sendMockup);
 
@@ -572,7 +569,7 @@ int sendUnknownMessageError(void) {
 }
 
 int sendCommunicationError(void) {
-    nadam_messageInfo_t info = { .name = "Virgo", .nameLength = 5 };
+    nadam_messageInfo_t info = { .name = "Virgo" };
     nadam_init(&info, 1, 4);
     fakeSendInitiate(failingSendMockup);
 
@@ -584,7 +581,7 @@ int sendCommunicationError(void) {
 }
 
 int sendVariableSizeExceedingLengthError(void) {
-    nadam_messageInfo_t info = { .name = "Libra", .nameLength = 5, .size = { true, { 7 } } };
+    nadam_messageInfo_t info = { .name = "Libra", .size = { true, { 7 } } };
     nadam_init(&info, 1, 4);
     fakeSendInitiate(sendMockup);
 
@@ -605,6 +602,7 @@ static struct {
     size_t bufIndex;
     uint32_t nRecv;
     uint8_t bufRecv[64];
+    bool delegateCalled;
 } recvMockupMbr;
 
 static int recvMockup(void *dest, uint32_t n) {
@@ -638,26 +636,71 @@ static void fakeRecvInitiate(const void *recvContent, size_t n) {
 }
 
 static void recvDelegateMockup(void *msg, uint32_t size, const nadam_messageInfo_t *mi) {
-    memcpy(recvMockupMbr.bufRecv, msg, size);
-    recvMockupMbr.nRecv = size;
+    recvMockupMbr.delegateCalled = true;
+    memcpy(recvMockupMbr.bufRecv + recvMockupMbr.nRecv, msg, size);
+    recvMockupMbr.nRecv += size;
 }
 
 // recvWorker helper - end
-// TODO tests - including variable length error
 int recvFixedSizeMessageBasic(void) {
-    nadam_messageInfo_t info = { .name = "Sagittarius", .nameLength = 11, .size = { false, { 5 } },
-        .hash = "Sagi" };
+    nadam_messageInfo_t info = { .name = "Sagittarius", .size = { false, { 5 } }, .hash = "Sagi" };
     nadam_init(&info, 1, 4);
     nadam_setDelegate("Sagittarius", recvDelegateMockup);
 
     const char *recvContent = "Sagi54321";
+    size_t recvContentLength = strlen(recvContent);
     const char *expected = "54321";
-    size_t expectedSize = strlen(expected);
-    fakeRecvInitiate(recvContent, strlen(recvContent));
+    size_t expectedLength = strlen(expected);
+    fakeRecvInitiate(recvContent, recvContentLength);
 
     ASSERT(recvMockupMbr.error == NADAM_ERROR_RECV);
-    ASSERT(recvMockupMbr.nRecv == expectedSize);
-    ASSERT(memcmp(recvMockupMbr.bufRecv, expected, expectedSize) == 0);
+    ASSERT(recvMockupMbr.nRecv == expectedLength);
+    ASSERT(memcmp(recvMockupMbr.bufRecv, expected, expectedLength) == 0);
+    return 0;
+}
+
+int recvVariableSizeMessageBasic(void) {
+    nadam_messageInfo_t info = { .name = "Capricorn", .size = { true, { 8 } }, .hash = "Capr" };
+    nadam_init(&info, 1, 4);
+    nadam_setDelegate("Capricorn", recvDelegateMockup);
+
+    const char recvContent[] = "Capr\x08\x00\x00\x00hi there";
+    size_t recvContentLength = sizeof(recvContent) - 1;
+    const char *expected = "hi there";
+    size_t expectedLength = strlen(expected);
+    fakeRecvInitiate(recvContent, recvContentLength);
+
+    ASSERT(recvMockupMbr.error == NADAM_ERROR_RECV);
+    ASSERT(recvMockupMbr.nRecv == expectedLength);
+    ASSERT(memcmp(recvMockupMbr.bufRecv, expected, expectedLength) == 0);
+    return 0;
+}
+
+int recvUnknownHashError(void) {
+    nadam_messageInfo_t info = { .name = "Cancer", .size = { false, { 5 } }, .hash = "Canc" };
+    nadam_init(&info, 1, 4);
+    nadam_setDelegate("Cancer", recvDelegateMockup);
+
+    const char *recvContent = "wrongHash";
+    size_t recvContentLength = strlen(recvContent);
+    fakeRecvInitiate(recvContent, recvContentLength);
+
+    ASSERT(recvMockupMbr.error == NADAM_ERROR_UNKNOWN_HASH);
+    ASSERT(!recvMockupMbr.delegateCalled);
+    return 0;
+}
+
+int recvVariableSizeError(void) {
+    nadam_messageInfo_t info = { .name = "Aquarius", .size = { true, { 5 } }, .hash = "Aqua" };
+    nadam_init(&info, 1, 4);
+    nadam_setDelegate("Aquarius", recvDelegateMockup);
+
+    const char recvContent[] = "Aqua\x06\x00\x00\x00hello!";
+    size_t recvContentLength = sizeof(recvContent) - 1;
+    fakeRecvInitiate(recvContent, recvContentLength);
+
+    ASSERT(recvMockupMbr.error == NADAM_ERROR_VARIABLE_SIZE);
+    ASSERT(!recvMockupMbr.delegateCalled);
     return 0;
 }
 
@@ -674,8 +717,8 @@ int tryToAllocateSmallAmountOfMemory(void) {
 
 // getIndexForName
 int getIndexForExistingName(void) {
-    nadam_messageInfo_t infos[] = { { .name = "the", .nameLength = 3 }, { .name = "quick", .nameLength = 5 },
-        { .name = "brown", .nameLength = 5 }, { .name = "fox", .nameLength = 3 } };
+    nadam_messageInfo_t infos[] = { { .name = "the" }, { .name = "quick" },
+        { .name = "brown" }, { .name = "fox" } };
 
     nadam_init(infos, 4, 4);
     for (int i = 3; i >= 0; --i) {
@@ -687,7 +730,7 @@ int getIndexForExistingName(void) {
 }
 
 int tryGettingIndexForUnknownName(void) {
-    nadam_messageInfo_t infos[] = { { .name = "foo", .nameLength = 3 }, { .name = "bar", .nameLength = 3 } };
+    nadam_messageInfo_t infos[] = { { .name = "foo" }, { .name = "bar" } };
 
     nadam_init(infos, 2, 4);
     size_t index;
