@@ -602,6 +602,7 @@ static struct {
     int error;
     size_t n;
     uint8_t buf[64];
+    size_t bufIndex;
     uint32_t nRecv;
     uint8_t bufRecv[64];
 } recvMockupMbr;
@@ -610,8 +611,9 @@ static int recvMockup(void *dest, uint32_t n) {
     if (n > recvMockupMbr.n)
         return -1;
 
-    memcpy(dest, recvMockupMbr.buf, n);
+    memcpy(dest, recvMockupMbr.buf + recvMockupMbr.bufIndex, n);
     recvMockupMbr.n -= n;
+    recvMockupMbr.bufIndex += n;
     return 0;
 }
 
@@ -622,9 +624,9 @@ static void errorDelegateMockup(int error) {
 static void fakeRecvInitiate(const void *recvContent, size_t n) {
     assert(n <= sizeof(recvMockupMbr.buf));
 
+    memset(&recvMockupMbr, 0, sizeof(recvMockupMbr));
     memcpy(recvMockupMbr.buf, recvContent, n);
     recvMockupMbr.n = n;
-    recvMockupMbr.error = 0;
 
     mbr.recv = recvMockup;
     mbr.errorDelegate = errorDelegateMockup;
@@ -639,6 +641,7 @@ static void recvDelegateMockup(void *msg, uint32_t size, const nadam_messageInfo
     memcpy(recvMockupMbr.bufRecv, msg, size);
     recvMockupMbr.nRecv = size;
 }
+
 // recvWorker helper - end
 // TODO tests - including variable length error
 int recvFixedSizeMessageBasic(void) {
@@ -654,8 +657,6 @@ int recvFixedSizeMessageBasic(void) {
 
     ASSERT(recvMockupMbr.error == NADAM_ERROR_RECV);
     ASSERT(recvMockupMbr.nRecv == expectedSize);
-    // FIXME
-    //printf(recvMockupMbr.bufRecv);
     ASSERT(memcmp(recvMockupMbr.bufRecv, expected, expectedSize) == 0);
     return 0;
 }
