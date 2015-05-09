@@ -42,6 +42,9 @@ typedef struct {
     nadam_recv_t recv;
 
     nadam_errorDelegate_t errorDelegate;
+
+    pthread_t threadId;
+    bool isThreadRunning;
 } nadamMembers_t;
 
 // private declarations
@@ -62,11 +65,13 @@ static int handshakeSendHashLength(void);
 static int handshakeHandleHashLengthRecv(void);
 static int sendFixedSize(const nadam_messageInfo_t *mi, const void *msg);
 static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint32_t size);
-// recv (delegate error reporting)
-static int recvWorker(void *arg);
+// recv group -- errors are reported via error delegate
+static void *recvWorker(void *arg);
 static int getIndexForHash(const uint8_t *hash, size_t *index);
 static uint32_t truncateHash(const uint8_t *hash);
 static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size);
+static void createRecvThread(void);
+static void cancelRecvThread(void);
 
 static nadamMembers_t mbr;
 
@@ -76,6 +81,7 @@ int nadam_init(const nadam_messageInfo_t *messageInfos, size_t messageCount, siz
     if (testInitIn(messageCount, hashLengthMin))
         return -1;
 
+    cancelRecvThread();
     freeMembers();
     memset(&mbr, 0, sizeof(nadamMembers_t));
 
@@ -136,8 +142,8 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
         return -1;
 
     fillHashMap();
-    // TODO spawn thread
-
+    cancelRecvThread();
+    createRecvThread();
     return 0;
 }
 
@@ -159,6 +165,7 @@ int nadam_sendWin(const char *name, const void *msg, uint32_t size) {
 }
 
 void nadam_stop(void) {
+    cancelRecvThread();
 }
 
 // private functions
@@ -329,19 +336,19 @@ static int sendVariableSize(const nadam_messageInfo_t *mi, const void *msg, uint
 }
 
 // recv
-static int recvWorker(void *arg) {
+static void *recvWorker(void *arg) {
     uint8_t hash[HASH_LENGTH_MAX];
     while (true) {
         if (mbr.recv(hash, (uint32_t) mbr.hashLength)) {
             mbr.errorDelegate(NADAM_ERROR_RECV);
-            return -1;
+            return NULL;
         }
 
         size_t index;
         int error = getIndexForHash(hash, &index);
         if (error) {
             mbr.errorDelegate(error);
-            return -1;
+            return NULL;
         }
 
         const nadam_messageInfo_t *messageInfo = mbr.messageInfos + index;
@@ -349,7 +356,7 @@ static int recvWorker(void *arg) {
         error = getMessageSize(messageInfo, &size);
         if (error) {
             mbr.errorDelegate(error);
-            return -1;
+            return NULL;
         }
 
         const recvDelegateRelated_t *delegate = mbr.delegates + index;
@@ -357,7 +364,7 @@ static int recvWorker(void *arg) {
         *delegate->recvStart = true;
         if (mbr.recv(buffer, size)) {
             mbr.errorDelegate(NADAM_ERROR_RECV);
-            return -1;
+            return NULL;
         }
 
         delegate->delegate(buffer, size, messageInfo);
@@ -396,6 +403,25 @@ static int getMessageSize(const nadam_messageInfo_t *mi, uint32_t *size) {
 
     *size = s;
     return 0;
+}
+
+static void createRecvThread(void) {
+    assert(!mbr.isThreadRunning);
+
+    int error = pthread_create(&mbr.threadId, NULL, recvWorker, NULL);
+    assert(!error);
+    mbr.isThreadRunning = true;
+}
+
+static void cancelRecvThread(void) {
+    if (!mbr.isThreadRunning)
+        return;
+
+    int error = pthread_cancel(mbr.threadId);
+    assert(!error);
+    error = pthread_join(mbr.threadId, NULL);
+    assert(!error);
+    mbr.isThreadRunning = false;
 }
 
 // unittest
@@ -631,8 +657,7 @@ static void fakeRecvInitiate(const void *recvContent, size_t n) {
     mbr.hashLength = 4;
 
     fillHashMap();
-    int error = recvWorker(NULL);
-    assert(error == -1);
+    recvWorker(NULL);
 }
 
 static void recvDelegateMockup(void *msg, uint32_t size, const nadam_messageInfo_t *mi) {
@@ -640,8 +665,8 @@ static void recvDelegateMockup(void *msg, uint32_t size, const nadam_messageInfo
     memcpy(recvMockupMbr.bufRecv + recvMockupMbr.nRecv, msg, size);
     recvMockupMbr.nRecv += size;
 }
-
 // recvWorker helper - end
+
 int recvFixedSizeMessageBasic(void) {
     nadam_messageInfo_t info = { .name = "Sagittarius", .size = { false, { 5 } }, .hash = "Sagi" };
     nadam_init(&info, 1, 4);
