@@ -141,6 +141,7 @@ int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t e
     if (handshakeHandleHashLengthRecv())
         return -1;
 
+    kh_clear(m32, mbr.hashKeyMap);
     fillHashMap();
     cancelRecvThread();
     createRecvThread();
