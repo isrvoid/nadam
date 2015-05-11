@@ -32,6 +32,7 @@
 # ------------------------------------------------------------------------------
 todo
 typegen
-nadamc
 *_t
 *_t.c
+example/src/process_a
+example/src/process_b

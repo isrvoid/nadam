@@ -10,9 +10,8 @@ DFLAGS := -release -O -boundscheck=off
 DTESTFLAGS := -unittest
 
 CC := clang
-# FIXME remove -Wno-unused-parameter if functions are implemented
-CWARNINGS := -Weverything -Wno-padded -Wno-unused-parameter \
-	-Wno-unused-function -Wno-reserved-id-macro
+CWARNINGS := -Weverything -Wno-padded -Wno-unused-function \
+	-Wno-reserved-id-macro -Wno-unused-parameter
 COMMON_CFLAGS := -std=c11 $(CWARNINGS) -I$(CINCLUDEDIR) -pthread
 CFLAGS := $(COMMON_CFLAGS) -O3
 CFLAGS_T := $(COMMON_CFLAGS) -O1 -Wno-missing-prototypes -DUNITTEST
@@ -25,8 +24,11 @@ typegen: $(TYPEGENSRC)
 typegen_t: $(TYPEGENSRC)
 	@dmd $(TYPEGENSRC) -of$@ $(DTESTFLAGS)
 
-nadamc: $(NADAMCSRC)
-	@$(CC) $(CFLAGS) $(NADAMCSRC) -o $@
+libnadamc.a: nadamc.o
+	@ar rcs $@ $<
+
+nadamc.o: $(NADAMCSRC)
+	@$(CC) $(CFLAGS) $(NADAMCSRC) -c -o $@
 
 nadamc_t: nadamc_t.c
 	@$(CC) $(CFLAGS_T) $(NADAMCSRC) $< -o $@
@@ -35,7 +37,7 @@ nadamc_t.c: $(NADAMCSRC)
 	@gendsu $(NADAMCSRC) -of$@
 
 clean:
-	-@$(RM) $(wildcard *.o *.obj *_t *.exe typegen nadamc nadamc_t.c)
+	-@$(RM) $(wildcard *.o *.obj *_t *.exe typegen libnadamc.a nadamc_t.c)
 
 AUXFILES := Makefile README.md
 
