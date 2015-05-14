@@ -1,42 +1,42 @@
-DROOTDIR := nadam
-TYPEGENDIR := $(DROOTDIR)/typegen
-TYPEGENSRC := $(shell find $(TYPEGENDIR) -type f -name "*.d") $(DROOTDIR)/types.d
+GENNMISRC := nadam/infogen/generator.d nadam/infogen/parser.d nadam/types.d
 
-CROOTDIR := src
-CINCLUDEDIR := include
-NADAMCSRC := $(shell find $(CROOTDIR) -type f -name "*.c")
+CSRCDIR := src
+NADAMCINCLUDE := include
+NADAMCSRC := $(CSRCDIR)/nadam.c
+
+BUILDDIR := build
 
 DFLAGS := -release -O -boundscheck=off
-DTESTFLAGS := -unittest
+DFLAGS_T := -unittest
 
 CC := clang
 CWARNINGS := -Weverything -Wno-padded -Wno-unused-function \
 	-Wno-reserved-id-macro -Wno-unused-parameter
-COMMON_CFLAGS := -std=c11 $(CWARNINGS) -I$(CINCLUDEDIR) -pthread
+COMMON_CFLAGS := -std=c11 $(CWARNINGS) -I$(NADAMCINCLUDE) -pthread
 CFLAGS := $(COMMON_CFLAGS) -O3
 CFLAGS_T := $(COMMON_CFLAGS) -O1 -Wno-missing-prototypes -DUNITTEST
 
-typegen: $(TYPEGENSRC)
-	@dmd $(TYPEGENSRC) -of$@ $(DFLAGS)
+$(BUILDDIR)/gennmi: $(GENNMISRC)
+	@dmd $(DFLAGS) $(GENNMISRC) -of$@
 
-typegen_t: $(TYPEGENSRC)
-	@dmd $(TYPEGENSRC) -of$@ $(DTESTFLAGS)
+$(BUILDDIR)/gennmi_t: $(GENNMISRC)
+	@dmd $(DFLAGS_T) $(GENNMISRC) -of$@
 
-libnadamc.a: nadamc.o
+$(BUILDDIR)/libnadamc.a: $(BUILDDIR)/nadamc.o
 	@ar rcs $@ $<
 
-nadamc.o: $(NADAMCSRC)
+$(BUILDDIR)/nadamc.o: $(NADAMCSRC)
 	@$(CC) $(CFLAGS) $(NADAMCSRC) -c -o $@
 
-nadamc_t: nadamc_t.c
+$(BUILDDIR)/nadamc_t: $(BUILDDIR)/nadamc_t.c
 	@$(CC) $(CFLAGS_T) $(NADAMCSRC) $< -o $@
 
-nadamc_t.c: $(NADAMCSRC)
+$(BUILDDIR)/nadamc_t.c: $(NADAMCSRC)
 	@gendsu $(NADAMCSRC) -of$@
 
 clean:
-	-@$(RM) $(wildcard *.o *.obj *_t *.exe typegen libnadamc.a nadamc_t.c)
+	-@$(RM) $(wildcard $(BUILDDIR)/*)
 
 AUXFILES := Makefile README.md
 
-.PHONY: default clean
+.PHONY: clean

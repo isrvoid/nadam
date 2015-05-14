@@ -2,7 +2,7 @@
 Copyright:  Copyright Johannes Teichrieb 2015
 License:    opensource.org/licenses/MIT
 */
-module nadam.typegen.common;
+module nadam.infogen.parser;
 
 import std.regex;
 import std.conv : text;
@@ -75,10 +75,6 @@ enum : string
 }
 
 static parserRegex = ctRegex!(parserPattern, "m");
-
-void main(string[] args)
-{
-}
 
 // TODO add function attributes
 class Parser

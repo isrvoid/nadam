@@ -30,8 +30,6 @@
 
 # Files and folders
 # ------------------------------------------------------------------------------
-todo
-typegen
-*_t
-*_t.c
+TODO
+build/*
 example/build/*
