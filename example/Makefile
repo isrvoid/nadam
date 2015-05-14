@@ -1,24 +1,28 @@
 MAKEFLAGS := -j 2
+
 NADAMCDIR := ../build
 NADAMCINCLUDE := ../include
-SRCCDIR := src
+
+CSRCDIR := src
+
 BUILDDIR := build
+
 CFLAGS := -Weverything -Wno-padded -std=c11 -O1 -pthread -I$(NADAMCINCLUDE) -L$(NADAMCDIR) -lnadamc
 CC := clang
 
-examplec: runc_a runc_b
+CExample: runCProcessA runCProcessB
 
-runc_a: $(BUILDDIR)/processc_a
+runCProcessA: $(BUILDDIR)/CProcessA
 	@$<
 
-# B can't run much earlier than A because A creates communication pipes
-runc_b: $(BUILDDIR)/processc_b $(BUILDDIR)/processc_a
+# B can't run much earlier than A because A needs to create communication pipes
+runCProcessB: $(BUILDDIR)/CProcessB $(BUILDDIR)/CProcessA
 	@$<
 
-$(BUILDDIR)/processc_a: $(SRCCDIR)/process_a.c $(SRCCDIR)/connection.c
+$(BUILDDIR)/CProcessA: $(CSRCDIR)/processA.c $(CSRCDIR)/connection.c
 	@$(CC) $(CFLAGS) $^ -o $@
 
-$(BUILDDIR)/processc_b: $(SRCCDIR)/process_b.c $(SRCCDIR)/connection.c
+$(BUILDDIR)/CProcessB: $(CSRCDIR)/processB.c $(CSRCDIR)/connection.c
 	@$(CC) $(CFLAGS) $^ -o $@
 
 clean:
