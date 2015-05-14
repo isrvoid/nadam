@@ -77,7 +77,6 @@ int nadam_setDelegate(const char *name, nadam_recvDelegate_t delegate);
 int nadam_setDelegateWithRecvBuffer(const char *name, nadam_recvDelegate_t delegate,
         void *buffer, volatile bool *recvStart);
 
-// TODO? non blocking - errorDelegate gets NADAM_ERROR_HANDSHAKE_RECV
 int nadam_initiate(nadam_send_t send, nadam_recv_t recv, nadam_errorDelegate_t errorDelegate);
 
 /* nadam_send() can only be used after a successful nadam_initiate() call.

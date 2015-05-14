@@ -16,8 +16,6 @@ COMMON_CFLAGS := -std=c11 $(CWARNINGS) -I$(CINCLUDEDIR) -pthread
 CFLAGS := $(COMMON_CFLAGS) -O3
 CFLAGS_T := $(COMMON_CFLAGS) -O1 -Wno-missing-prototypes -DUNITTEST
 
-default: nadamc
-
 typegen: $(TYPEGENSRC)
 	@dmd $(TYPEGENSRC) -of$@ $(DFLAGS)
 

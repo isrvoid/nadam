@@ -35,7 +35,7 @@ static void errorDelegate(int error) {
 int main(void) {
     handleConnection();
 
-    nadam_init(nadamMessageInfos, NADAM_MESSAGE_INFO_COUNT, NADAM_MIN_HASH_LENGTH);
+    nadam_init(nadamMessageInfos, NADAM_MESSAGE_INFO_COUNT, NADAM_HASH_LENGTH_MIN);
     nadam_setDelegate("pong", recvDelegate);
     nadam_initiate(conn_send, conn_recv, errorDelegate);
 

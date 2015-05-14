@@ -193,7 +193,8 @@ static void freeMembers(void) {
 }
 
 static int allocateMembers(void) {
-    if (allocate(&mbr.commonRecvBuffer, getMaxMessageSize()))
+    // + 1 allows a delegate that uses common buffer to safely do msg[size] = '\0';
+    if (allocate(&mbr.commonRecvBuffer, getMaxMessageSize() + 1)) 
         return -1;
 
     if (allocate((void **) &mbr.delegates, sizeof(recvDelegateRelated_t) * mbr.messageCount))

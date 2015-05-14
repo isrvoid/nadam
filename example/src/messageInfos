@@ -1,0 +1,11 @@
+`ping`
+size_max = 1000
+
+`pong`
+size_max = 1000
+
+`Foo count`
+size = 4
+
+`Bar.duration`
+size = 8
