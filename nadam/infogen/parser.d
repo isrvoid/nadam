@@ -95,32 +95,32 @@ class Parser
         }
     }
 
-    immutable MessageIdSource[] sources;
+    immutable MessageIdentity[] sources;
 
     private:
 
     string input, toParse;
     Captures!string front;
 
-    MessageIdSource[] getSources()
+    auto getSources()
     {
         auto collector = new SourceCollector;
-        MessageIdSource currentSource;
-        while ((currentSource = getNextSource()) != MessageIdSource.init)
+        MessageIdentity currentSource;
+        while ((currentSource = getNextSource()) != MessageIdentity.init)
             collector.put(currentSource);
 
         return collector.sources;
     }
 
-    MessageIdSource getNextSource()
+    auto getNextSource()
     {
         auto name = getName();
         if (name == null)
-            return MessageIdSource.init;
+            return MessageIdentity.init;
 
         auto size = getSize();
 
-        return MessageIdSource(name, size);
+        return MessageIdentity(name, size);
     }
 
     string getName()
@@ -206,21 +206,21 @@ class Parser
 
     class SourceCollector
     {
-        import std.array : appender;
+        import std.array : Appender;
 
-        void put(MessageIdSource source) @safe
+        void put(MessageIdentity source) @safe
         {
             ensureUniqueName(source.name);
             collector.put(source);
         }
 
-        MessageIdSource[] sources() pure nothrow @property @safe
+        @property auto sources() pure nothrow @safe
         {
             return collector.data;
         }
 
         private:
-        auto collector = appender!(MessageIdSource[])();
+        Appender!(MessageIdentity[]) collector;
         bool[string] repeatedNameGuard;
 
         void ensureUniqueName(string name) @safe
@@ -251,8 +251,8 @@ unittest
 
     auto parser = new Parser(sequence);
     assert(parser.sources.length == 2);
-    assert(canFind(parser.sources, MessageIdSource("foo", MessageSize(42))));
-    assert(canFind(parser.sources, MessageIdSource("bar", MessageSize(123, true))));
+    assert(canFind(parser.sources, MessageIdentity("foo", MessageSize(42))));
+    assert(canFind(parser.sources, MessageIdentity("bar", MessageSize(123, true))));
 }
 
 unittest
@@ -285,7 +285,7 @@ unittest
     auto commentsOnly = "/**/// the quick brown fox\n/* jumps over the lazy dog */";
     auto parser = new Parser(commentsOnly, false);
 
-    assert(parser.getNextSource() == MessageIdSource.init);
+    assert(parser.getNextSource() == MessageIdentity.init);
 }
 
 unittest
@@ -293,7 +293,7 @@ unittest
     auto single = "`foo`\nsize = 3";
     auto parser = new Parser(single, false);
 
-    assert(parser.getNextSource() == MessageIdSource("foo", MessageSize(3)));
+    assert(parser.getNextSource() == MessageIdentity("foo", MessageSize(3)));
 }
 
 unittest
@@ -301,7 +301,7 @@ unittest
     auto singleVariableSize = "`bar` size_max=42";
     auto parser = new Parser(singleVariableSize, false);
 
-    assert(parser.getNextSource() == MessageIdSource("bar", MessageSize(42, true)));
+    assert(parser.getNextSource() == MessageIdentity("bar", MessageSize(42, true)));
 }
 
 unittest
@@ -310,9 +310,9 @@ unittest
         /* comment */ `gun`\nsize_max=\n /* comment */ 7";
 
     auto parser = new Parser(sequence, false);
-    assert(parser.getNextSource() == MessageIdSource("fun", MessageSize(3)));
-    assert(parser.getNextSource() == MessageIdSource("gun", MessageSize(7, true)));
-    assert(parser.getNextSource() == MessageIdSource.init);
+    assert(parser.getNextSource() == MessageIdentity("fun", MessageSize(3)));
+    assert(parser.getNextSource() == MessageIdentity("gun", MessageSize(7, true)));
+    assert(parser.getNextSource() == MessageIdentity.init);
     assert(parser.front.empty);
 }
 

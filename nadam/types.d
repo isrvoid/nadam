@@ -4,44 +4,27 @@ License:    opensource.org/licenses/MIT
 */
 module nadam.types;
 
-struct MessageId
+struct MessageInfo
 {
-    ubyte[20] hash;
+    string name;
     MessageSize size;
+    ubyte[20] hash;
 
-    this(MessageIdSource source) pure nothrow @safe
+    this(MessageIdentity id) pure nothrow @safe
     {
         import std.digest.sha;
         SHA1 sha;
-        sha.put(cast(immutable(ubyte)[]) source.name);
-        sha.put(cast(ubyte) source.size.isVariable);
-        uint[1] convSize = [source.size.total];
+        sha.put(cast(immutable(ubyte)[]) id.name);
+        sha.put(cast(ubyte) id.size.isVariable);
+        uint[1] convSize = [id.size.total];
         sha.put(cast(ubyte[4]) convSize);
         hash = sha.finish();
 
-        size = source.size;
-    }
-
-    this(in ubyte[] hash, MessageSize size) pure nothrow @safe
-    {
-        this.hash = hash;
-        this.size = size;
+        size = id.size;
     }
 }
 
-struct NamedMessageId
-{
-    string name;
-    MessageId id;
-
-    this(MessageIdSource source) pure nothrow @safe
-    {
-        name = source.name;
-        id = MessageId(source);
-    }
-}
-
-struct MessageIdSource
+struct MessageIdentity
 {
     string name;
     MessageSize size;
