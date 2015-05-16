@@ -82,7 +82,7 @@ class Parser
     this(string input)
     {
         this.input = toParse = input;
-        sources = getSources().idup;
+        ids = getIds().idup;
     }
 
     version (unittest)
@@ -91,28 +91,28 @@ class Parser
         {
             this.input = toParse = input;
             if (parse)
-                sources = getSources().idup;
+                ids = getIds().idup;
         }
     }
 
-    immutable MessageIdentity[] sources;
+    immutable MessageIdentity[] ids;
 
     private:
 
     string input, toParse;
     Captures!string front;
 
-    auto getSources()
+    auto getIds()
     {
-        auto collector = new SourceCollector;
-        MessageIdentity currentSource;
-        while ((currentSource = getNextSource()) != MessageIdentity.init)
-            collector.put(currentSource);
+        auto c = new IdCollector;
+        MessageIdentity currentId;
+        while ((currentId = getNextId()) != MessageIdentity.init)
+            c.put(currentId);
 
-        return collector.sources;
+        return c.data;
     }
 
-    auto getNextSource()
+    auto getNextId()
     {
         auto name = getName();
         if (name == null)
@@ -204,23 +204,23 @@ class Parser
         toParse = front.post;
     }
 
-    class SourceCollector
+    class IdCollector
     {
         import std.array : Appender;
 
-        void put(MessageIdentity source) @safe
+        void put(MessageIdentity id) @safe
         {
-            ensureUniqueName(source.name);
-            collector.put(source);
+            ensureUniqueName(id.name);
+            app.put(id);
         }
 
-        @property auto sources() pure nothrow @safe
+        @property auto data() pure nothrow @safe
         {
-            return collector.data;
+            return app.data;
         }
 
         private:
-        Appender!(MessageIdentity[]) collector;
+        Appender!(MessageIdentity[]) app;
         bool[string] repeatedNameGuard;
 
         void ensureUniqueName(string name) @safe
@@ -239,7 +239,7 @@ unittest
     auto comment = "// the quick brown fox";
     auto parser = new Parser(comment);
 
-    assert(parser.sources == null);
+    assert(parser.ids == null);
 }
 
 unittest
@@ -250,9 +250,9 @@ unittest
         /* jumpes over */42`bar`\n// the lazy dog\nsize_max=\r\n123";
 
     auto parser = new Parser(sequence);
-    assert(parser.sources.length == 2);
-    assert(canFind(parser.sources, MessageIdentity("foo", MessageSize(42))));
-    assert(canFind(parser.sources, MessageIdentity("bar", MessageSize(123, true))));
+    assert(parser.ids.length == 2);
+    assert(canFind(parser.ids, MessageIdentity("foo", MessageSize(42))));
+    assert(canFind(parser.ids, MessageIdentity("bar", MessageSize(123, true))));
 }
 
 unittest
@@ -279,13 +279,13 @@ unittest
     assert(caughtException);
 }
 
-// getNextSource
+// getNextId
 unittest
 {
     auto commentsOnly = "/**/// the quick brown fox\n/* jumps over the lazy dog */";
     auto parser = new Parser(commentsOnly, false);
 
-    assert(parser.getNextSource() == MessageIdentity.init);
+    assert(parser.getNextId() == MessageIdentity.init);
 }
 
 unittest
@@ -293,7 +293,7 @@ unittest
     auto single = "`foo`\nsize = 3";
     auto parser = new Parser(single, false);
 
-    assert(parser.getNextSource() == MessageIdentity("foo", MessageSize(3)));
+    assert(parser.getNextId() == MessageIdentity("foo", MessageSize(3)));
 }
 
 unittest
@@ -301,7 +301,7 @@ unittest
     auto singleVariableSize = "`bar` size_max=42";
     auto parser = new Parser(singleVariableSize, false);
 
-    assert(parser.getNextSource() == MessageIdentity("bar", MessageSize(42, true)));
+    assert(parser.getNextId() == MessageIdentity("bar", MessageSize(42, true)));
 }
 
 unittest
@@ -310,9 +310,9 @@ unittest
         /* comment */ `gun`\nsize_max=\n /* comment */ 7";
 
     auto parser = new Parser(sequence, false);
-    assert(parser.getNextSource() == MessageIdentity("fun", MessageSize(3)));
-    assert(parser.getNextSource() == MessageIdentity("gun", MessageSize(7, true)));
-    assert(parser.getNextSource() == MessageIdentity.init);
+    assert(parser.getNextId() == MessageIdentity("fun", MessageSize(3)));
+    assert(parser.getNextId() == MessageIdentity("gun", MessageSize(7, true)));
+    assert(parser.getNextId() == MessageIdentity.init);
     assert(parser.front.empty);
 }
 
@@ -323,7 +323,7 @@ unittest
     bool caughtException;
     auto parser = new Parser(negativeSize, false);
     try
-        parser.getNextSource();
+        parser.getNextId();
     catch (UndefinedTokenException e)
         caughtException = true;
 
