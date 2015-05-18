@@ -4,12 +4,14 @@ License:    opensource.org/licenses/MIT
 */
 module nadam.infogen.generator;
 
+import std.range : empty;
 import std.array : Appender;
+import std.conv : text;
 import std.stdio : writeln;
 
 import nadam.types;
 
-void main(string args[])
+int main(string args[])
 {
     import std.file : read, write;
 
@@ -24,6 +26,8 @@ void main(string args[])
 
         return -1;
     }
+
+    return 0;
 }
 
 // copied from gendsu - TODO refactor and move to util
@@ -32,7 +36,6 @@ struct ArgumentParser
 {
     private Appender!(string[]) fileApp;
     private enum outputFileSwitch = "-of";
-    private enum 
 
     string[] errors;
 
@@ -85,102 +88,93 @@ struct ArgumentParser
     }
 }
 
-// FIXME PluginMaker doesn't merge message info lists,
-// it creates a plugin file from a single MessageIdentity list.
-struct PluginMaker
+struct InfoMaker
 {
     private:
-    Appender!(Func[]) funcApp;
-    Appender!string pluginApp;
+    MessageInfo[] infos;
+    Appender!string app;
 
-    struct Func
-    {
-        string name;
-        string file;
+    @disable this();
+
+    public this(MessageIdentity[] ids) {
+        infos = new MessageInfo[ids.length];
+        foreach (i, id; ids)
+            infos[i] = MessageInfo(id);
+
+        makeInfos();
     }
 
-    public void putFunc(string[] names, string file) pure nothrow @safe
+    public @property string infosResult() pure nothrow @safe
     {
-        foreach (name; names)
-            funcApp.put(Func(name, file));
+        return app.data;
     }
 
-    public string makePlugin() pure nothrow @safe
+    auto makeInfos() pure @safe
     {
-        import std.conv : text;
+        app = app.init;
 
-        pluginApp = pluginApp.init;
-
-        putFunctionDeclarations();
+        putInfoCount(infos.length);
+        putMinHashLength(getMinHashLength());
         newline();
 
-        putFunctionArray();
+        putInfoArray();
 
-        return plugin;
+        return infosResult;
     }
 
-    public string plugin() pure nothrow @safe
+    void putInfoCount(size_t count) pure nothrow @safe
     {
-        return pluginApp.data;
+        app.put("#define MESSAGE_INFO_COUNT ");
+        putLine(text(count));
     }
 
+    void putMinHashLength(size_t val) pure nothrow @safe
     {
-        putLine("static const _unittest_func_t _unittest_functions[] = {");
-
-        putFunctionLiterals();
-        newline();
-
-        pluginApp.put("};");
+        app.put("#define HASH_LENGTH_MIN ");
+        putLine(text(val));
     }
 
-    void putFunctionLiterals() pure nothrow @safe
+    size_t getMinHashLength() pure nothrow @safe
     {
-        enum softLineWidth = 100;
-        enum syntaxOverheadLength = `{,"()",""},`.length;
-        enum lineIndent = "    ";
+        return 2; // FIXME
+    }
 
-        auto lineLength = lineIndent.length;
+    void putInfoArray() pure @safe
+    {
+        putLine("static const nadam_messageInfo_t messageInfos[] = {");
+        putInfoLiterals();
+        putLine("};");
+    }
 
-        void startNewLine() pure nothrow @safe
+    void putInfoLiterals() pure @safe
+    {
+        foreach (info; infos)
         {
+            app.put(`    `);
+            app.put(`{ "`);
+            app.put(info.name);
+            app.put(`", `);
+            app.put(text(info.name.length));
+            app.put(`, { `);
+            app.put(text(cast(int) info.size.isVariable));
+            app.put(`, { `);
+            app.put(text(info.size.total));
+            app.put(` }, { `);
+            app.put(text(info.hash)[1 .. $ - 1]);
+            app.put(` } },`);
             newline();
-            pluginApp.put(lineIndent);
-            lineLength = lineIndent.length;
-        }
-
-        pluginApp.put(lineIndent);
-
-        foreach (func; functions)
-        {
-            if (lineLength > softLineWidth)
-                startNewLine();
-
-            pluginApp.put("{");
-            pluginApp.put(func.name);
-            pluginApp.put(`,"`);
-            pluginApp.put(func.name);
-            pluginApp.put(`()","`);
-            pluginApp.put(func.file);
-            pluginApp.put(`"},`);
-
-            lineLength += func.name.length * 2 + func.file.length + syntaxOverheadLength;
         }
     }
 
     void putLine(string s) pure nothrow @safe
     {
-        pluginApp.put(s);
+        app.put(s);
         newline();
     }
 
     void newline() pure nothrow @safe
     {
-        pluginApp.put("\n");
-    }
-
-    Func[] functions() pure nothrow @safe
-    {
-        return funcApp.data;
+        app.put("\n");
     }
 }
 

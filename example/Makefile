@@ -20,10 +20,10 @@ runCProcessB: $(BUILDDIR)/CProcessB $(BUILDDIR)/CProcessA
 	@$<
 
 $(BUILDDIR)/CProcessA: $(CSRCDIR)/processA.c $(CSRCDIR)/connection.c
-	@$(CC) $(CFLAGS) $^ -o $@
+	@$(CC) $^ $(CFLAGS) -o $@
 
 $(BUILDDIR)/CProcessB: $(CSRCDIR)/processB.c $(CSRCDIR)/connection.c
-	@$(CC) $(CFLAGS) $^ -o $@
+	@$(CC) $^ $(CFLAGS) -o $@
 
 clean:
 	-@$(RM) $(wildcard $(BUILDDIR)/*)
