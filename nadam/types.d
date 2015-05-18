@@ -13,14 +13,15 @@ struct MessageInfo
     this(MessageIdentity id) pure nothrow @safe
     {
         import std.digest.sha;
+        name = id.name;
+        size = id.size;
+
         SHA1 sha;
-        sha.put(cast(immutable(ubyte)[]) id.name);
-        sha.put(cast(ubyte) id.size.isVariable);
-        uint[1] convSize = [id.size.total];
+        sha.put(cast(immutable(ubyte)[]) name);
+        sha.put(cast(ubyte) size.isVariable);
+        uint[1] convSize = [size.total];
         sha.put(cast(ubyte[4]) convSize);
         hash = sha.finish();
-
-        size = id.size;
     }
 }
 

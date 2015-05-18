@@ -33,3 +33,4 @@
 TODO
 build/*
 example/build/*
+example/src/messageInfos.c

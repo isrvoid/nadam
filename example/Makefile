@@ -4,6 +4,7 @@ NADAMCDIR := ../build
 NADAMCINCLUDE := ../include
 
 CSRCDIR := src
+CMESSAGEINFOSSRC := $(CSRCDIR)/messageInfos.c
 
 BUILDDIR := build
 
@@ -19,11 +20,14 @@ runCProcessA: $(BUILDDIR)/CProcessA
 runCProcessB: $(BUILDDIR)/CProcessB $(BUILDDIR)/CProcessA
 	@$<
 
-$(BUILDDIR)/CProcessA: $(CSRCDIR)/processA.c $(CSRCDIR)/connection.c
-	@$(CC) $^ $(CFLAGS) -o $@
+$(BUILDDIR)/CProcessA: $(CSRCDIR)/processA.c $(CSRCDIR)/connection.c $(CMESSAGEINFOSSRC)
+	@$(CC) $< $(CSRCDIR)/connection.c $(CFLAGS) -o $@
 
-$(BUILDDIR)/CProcessB: $(CSRCDIR)/processB.c $(CSRCDIR)/connection.c
-	@$(CC) $^ $(CFLAGS) -o $@
+$(BUILDDIR)/CProcessB: $(CSRCDIR)/processB.c $(CSRCDIR)/connection.c $(CMESSAGEINFOSSRC)
+	@$(CC) $< $(CSRCDIR)/connection.c $(CFLAGS) -o $@
+
+$(CMESSAGEINFOSSRC): $(CSRCDIR)/messageIdentities
+	@gennmi $^ -of$@
 
 clean:
-	-@$(RM) $(wildcard $(BUILDDIR)/*)
+	-@$(RM) $(wildcard $(CMESSAGEINFOSSRC) $(BUILDDIR)/*)

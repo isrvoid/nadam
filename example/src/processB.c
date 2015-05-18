@@ -33,7 +33,7 @@ static void errorDelegate(int error) {
 int main(void) {
     handleConnection();
 
-    nadam_init(nadamMessageInfos, NADAM_MESSAGE_INFO_COUNT, NADAM_HASH_LENGTH_MIN);
+    nadam_init(messageInfos, MESSAGE_INFO_COUNT, HASH_LENGTH_MIN);
     nadam_setDelegate("ping", recvDelegate);
     nadam_initiate(conn_send, conn_recv, errorDelegate);
 

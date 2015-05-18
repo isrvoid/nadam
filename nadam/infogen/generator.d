@@ -10,10 +10,12 @@ import std.conv : text;
 import std.stdio : writeln;
 
 import nadam.types;
+import nadam.infogen.parser;
 
 int main(string args[])
 {
-    import std.file : read, write;
+    import std.file : readText, write;
+    import std.encoding : sanitize;
 
     version (unittest)
         return 0;
@@ -22,10 +24,19 @@ int main(string args[])
     if (!parsedArgs.errors.empty)
     {
         foreach (error; parsedArgs.errors)
-            writeln("gendsu: error: ", error);
+            writeln("gennmi: error: ", error);
 
         return -1;
     }
+
+    // TODO add merging of multiple input files
+    if (parsedArgs.files.length > 1)
+        throw new Exception("support for multiple input files will be added in the future");
+
+    auto content = sanitize(readText(parsedArgs.files[0]));
+    auto parser = new Parser(content);
+    auto infoMaker = InfoMaker(parser.ids);
+    write(parsedArgs.outputFile, infoMaker.infosResult);
 
     return 0;
 }
@@ -96,7 +107,7 @@ struct InfoMaker
 
     @disable this();
 
-    public this(MessageIdentity[] ids) {
+    public this(inout(MessageIdentity)[] ids) {
         infos = new MessageInfo[ids.length];
         foreach (i, id; ids)
             infos[i] = MessageInfo(id);
@@ -159,7 +170,7 @@ struct InfoMaker
             app.put(text(cast(int) info.size.isVariable));
             app.put(`, { `);
             app.put(text(info.size.total));
-            app.put(` }, { `);
+            app.put(` } }, { `);
             app.put(text(info.hash)[1 .. $ - 1]);
             app.put(` } },`);
             newline();
@@ -177,7 +188,4 @@ struct InfoMaker
         app.put("\n");
     }
 }
-
-// unittest
-// -----------------------------------------------------------------------------
 
