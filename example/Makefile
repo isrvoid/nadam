@@ -8,7 +8,8 @@ CMESSAGEINFOSSRC := $(CSRCDIR)/messageInfos.c
 
 BUILDDIR := build
 
-CFLAGS := -Weverything -Wno-padded -std=c11 -O1 -pthread -I$(NADAMCINCLUDE) -L$(NADAMCDIR) -lnadamc
+CFLAGS := -Weverything -Wno-padded -Wno-unused-parameter -std=c11 -O1 -pthread \
+	-I$(NADAMCINCLUDE) -L$(NADAMCDIR) -lnadamc
 CC := clang
 
 CExample: runCProcessA runCProcessB
